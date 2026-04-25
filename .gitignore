@@ -9,6 +9,15 @@ careconnect-backend/mvnw
 careconnect-backend/mvnw.cmd
 
 # ========================
+# FRONTEND
+# ========================
+careconnect-frontend/node_modules/
+careconnect-frontend/dist/
+careconnect-frontend/.env
+careconnect-frontend/.env.local
+careconnect-frontend/.env.production
+
+# ========================
 # OS / IDE
 # ========================
 .DS_Store
