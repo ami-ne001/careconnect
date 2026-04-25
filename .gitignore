@@ -1,0 +1,18 @@
+# ========================
+# BACKEND
+# ========================
+careconnect-backend/target/
+careconnect-backend/.idea/
+careconnect-backend/**/*.iml
+careconnect-backend/.mvn/wrapper/maven-wrapper.jar
+careconnect-backend/mvnw
+careconnect-backend/mvnw.cmd
+
+# ========================
+# OS / IDE
+# ========================
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
