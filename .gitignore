@@ -1,12 +1,11 @@
 # ========================
-# BACKEND
+# ALL BACKEND SERVICES
 # ========================
-careconnect-backend/target/
-careconnect-backend/.idea/
-careconnect-backend/**/*.iml
-careconnect-backend/.mvn/wrapper/maven-wrapper.jar
-careconnect-backend/mvnw
-careconnect-backend/mvnw.cmd
+**/target/
+**/.mvn/wrapper/maven-wrapper.jar
+**/mvnw
+**/mvnw.cmd
+**/*.iml
 
 # ========================
 # FRONTEND
@@ -18,10 +17,15 @@ careconnect-frontend/.env.local
 careconnect-frontend/.env.production
 
 # ========================
-# OS / IDE
+# IDE
+# ========================
+.idea/
+.vscode/
+*.iml
+
+# ========================
+# OS
 # ========================
 .DS_Store
 Thumbs.db
 *.log
-.vscode/
-.idea/
