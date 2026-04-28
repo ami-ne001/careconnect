@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # Infrastructure Services
+  mysql:
+    image: mysql:8
+    container_name: careconnect-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql-data:/var/lib/mysql
+    networks:
+      - careconnect-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: careconnect-rabbitmq
+    ports:
+      - "5672:5672"   # Message broker port
+      - "15672:15672" # Management UI port
+    networks:
+      - careconnect-network
+
+  # Microservices
+  auth-service:
+    build: ./auth-service
+    container_name: careconnect-auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/careconnect_auth?allowPublicKeyRetrieval=true&useSSL=false
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - careconnect-network
+
+  patient-service:
+    build: ./patient-service
+    container_name: careconnect-patient-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/careconnect_patient?allowPublicKeyRetrieval=true&useSSL=false
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - careconnect-network
+
+  appointment-service:
+    build: ./appointment-service
+    container_name: careconnect-appointment-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/careconnect_appointment?allowPublicKeyRetrieval=true&useSSL=false
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - careconnect-network
+
+  clinical-service:
+    build: ./clinical-service
+    container_name: careconnect-clinical-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/careconnect_clinical?allowPublicKeyRetrieval=true&useSSL=false
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - careconnect-network
+
+  lab-service:
+    build: ./lab-service
+    container_name: careconnect-lab-service
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/careconnect_lab?allowPublicKeyRetrieval=true&useSSL=false
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - careconnect-network
+
+  billing-service:
+    build: ./billing-service
+    container_name: careconnect-billing-service
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/careconnect_billing?allowPublicKeyRetrieval=true&useSSL=false
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - mysql
+      - rabbitmq
+    networks:
+      - careconnect-network
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: careconnect-api-gateway
+    ports:
+      - "8088:8088"
+    depends_on:
+      - auth-service
+      - patient-service
+      - appointment-service
+      - clinical-service
+      - lab-service
+      - billing-service
+    networks:
+      - careconnect-network
+
+  # Frontend
+  careconnect-frontend:
+    build: ./careconnect-frontend
+    container_name: careconnect-frontend
+    ports:
+      - "80:80"
+    networks:
+      - careconnect-network
+
+networks:
+  careconnect-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
