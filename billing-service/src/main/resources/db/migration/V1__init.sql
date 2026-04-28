@@ -35,7 +35,7 @@ CREATE TABLE payments (
     invoice_id  INT UNSIGNED  NOT NULL,
     received_by INT UNSIGNED  NULL,   -- ref to auth-service users.id
     amount      DECIMAL(10,2) NOT NULL,
-    method      ENUM('CASH','CARD','INSURANCE','TRANSFER') NOT NULL,
+    method      ENUM('CASH','CARD','INSURANCE') NOT NULL,
     paid_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reference   VARCHAR(100),
     CONSTRAINT fk_pay_invoice FOREIGN KEY (invoice_id)

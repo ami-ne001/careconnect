@@ -22,7 +22,7 @@ CREATE TABLE users (
                        'PATIENT','LAB_TECHNICIAN') NOT NULL,
     department_id INT UNSIGNED NULL,
     phone         VARCHAR(20),
-    gender        ENUM('MALE','FEMALE','OTHER'),
+    gender        ENUM('MALE','FEMALE'),
     date_of_birth DATE,
     address       VARCHAR(255),
     is_active     BOOLEAN  NOT NULL DEFAULT TRUE,

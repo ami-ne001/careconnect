@@ -5,6 +5,30 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+CREATE TABLE doctor_availability (
+    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    doctor_id   INT UNSIGNED NOT NULL,  -- ref to auth-service users.id
+    day_of_week ENUM('MONDAY','TUESDAY','WEDNESDAY','THURSDAY',
+                     'FRIDAY','SATURDAY','SUNDAY') NOT NULL,
+    start_time  TIME NOT NULL,
+    end_time    TIME NOT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                         ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_doctor_day (doctor_id, day_of_week)
+);
+
+CREATE TABLE doctor_unavailability (
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    doctor_id  INT UNSIGNED NOT NULL,  -- ref to auth-service users.id
+    start_date DATE     NOT NULL,
+    end_date   DATE     NOT NULL,
+    reason     VARCHAR(255),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        ON UPDATE CURRENT_TIMESTAMP
+);
+
 CREATE TABLE appointments (
     id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     patient_id       INT UNSIGNED NOT NULL,  -- ref to auth-service users.id

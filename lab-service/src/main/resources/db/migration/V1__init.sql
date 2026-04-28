@@ -13,6 +13,19 @@ CREATE TABLE lab_test_types (
     description TEXT
 );
 
+CREATE TABLE lab_test_reference_ranges (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    test_type_id  INT UNSIGNED NOT NULL,
+    component     VARCHAR(100) NOT NULL,  -- e.g. "WBC", "Hemoglobin", "LDL"
+    unit          VARCHAR(30),            -- e.g. "K/uL", "g/dL", "mg/dL"
+    min_value     DECIMAL(10,2),
+    max_value     DECIMAL(10,2),
+    gender        ENUM('MALE','FEMALE','BOTH') DEFAULT 'BOTH',
+    notes         TEXT,
+    CONSTRAINT fk_ref_range_test FOREIGN KEY (test_type_id)
+        REFERENCES lab_test_types(id) ON DELETE CASCADE
+);
+
 CREATE TABLE lab_requests (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     consultation_id INT UNSIGNED NOT NULL,  -- ref to clinical-service consultations.id
@@ -34,7 +47,6 @@ CREATE TABLE lab_results (
     technician_id  INT UNSIGNED NOT NULL,  -- ref to auth-service users.id
     result_data    JSON,
     interpretation TEXT,
-    is_critical    BOOLEAN  NOT NULL DEFAULT FALSE,
     uploaded_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_res_request FOREIGN KEY (lab_request_id)
         REFERENCES lab_requests(id)
