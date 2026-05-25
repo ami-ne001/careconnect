@@ -1,5 +1,6 @@
 package com.careconnect.auth.controller;
 
+import com.careconnect.auth.dto.ForgotPasswordRequest;
 import com.careconnect.auth.dto.LoginRequest;
 import com.careconnect.auth.dto.LoginResponse;
 import com.careconnect.auth.service.AuthService;
@@ -23,6 +24,12 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/admin-only")
