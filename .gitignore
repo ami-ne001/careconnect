@@ -16,6 +16,9 @@ careconnect-frontend/.env
 careconnect-frontend/.env.local
 careconnect-frontend/.env.production
 
+# Frontend snapshot before recovery
+frontend-corrupted/
+
 # ========================
 # IDE
 # ========================
