@@ -5,17 +5,15 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class PatientDischargedEvent {
-    private Long admissionId;
     private Long patientId;
-    private Long roomId;
-    private String roomNumber;
-    private Long nights;
-    private BigDecimal pricePerNight;
+    private Long admissionId;
+    private LocalDateTime dischargedAt;
+    private String dischargeStatus;
 }

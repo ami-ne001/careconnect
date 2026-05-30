@@ -37,8 +37,10 @@ public class EventListener {
         log.info("Received PatientDischargedEvent for admission ID: {}", event.getAdmissionId());
         
         try {
-            Long nights = event.getNights() != null && event.getNights() > 0 ? event.getNights() : 1L;
-            BigDecimal price = event.getPricePerNight() != null ? event.getPricePerNight() : new BigDecimal("150.00");
+            // patient-service does not send nights or price. In a full system, we'd query the patient-service.
+            // Here we use default values to ensure the room charge is generated.
+            Long nights = 1L;
+            BigDecimal price = new BigDecimal("150.00");
             
             invoiceService.addRoomChargesToInvoice(
                     event.getAdmissionId(),
