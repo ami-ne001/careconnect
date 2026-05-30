@@ -1,7 +1,9 @@
 package com.careconnect.clinicalservice.service;
 
+import com.careconnect.clinicalservice.client.AppointmentServiceClient;
 import com.careconnect.clinicalservice.client.AuthServiceClient;
 import com.careconnect.clinicalservice.client.PatientServiceClient;
+import com.careconnect.clinicalservice.dto.AppointmentResponse;
 import com.careconnect.clinicalservice.dto.ConsultationCreateRequest;
 import com.careconnect.clinicalservice.dto.ConsultationResponse;
 import com.careconnect.clinicalservice.dto.ConsultationUpdateRequest;
@@ -36,6 +38,7 @@ public class ConsultationService {
     private final AuditLogRepository auditLogRepository;
     private final AuthServiceClient authServiceClient;
     private final PatientServiceClient patientServiceClient;
+    private final AppointmentServiceClient appointmentServiceClient;
     private final EventPublisher eventPublisher;
 
     @Transactional
@@ -45,6 +48,22 @@ public class ConsultationService {
         // Verify unique appointment ID
         if (consultationRepository.findByAppointmentId(request.getAppointmentId()).isPresent()) {
             throw new BadRequestException("Consultation already exists for appointment ID: " + request.getAppointmentId());
+        }
+
+        // Verify appointment exists and matches doctor and patient
+        try {
+            AppointmentResponse appointment = appointmentServiceClient.getAppointmentById(request.getAppointmentId());
+            if (appointment == null) {
+                throw new BadRequestException("Appointment not found with ID: " + request.getAppointmentId());
+            }
+            if (!appointment.getPatientId().equals(request.getPatientId())) {
+                throw new BadRequestException("Patient ID in request does not match the appointment patient");
+            }
+            if (!appointment.getDoctorId().equals(request.getDoctorId())) {
+                throw new BadRequestException("Doctor ID in request does not match the appointment doctor");
+            }
+        } catch (Exception e) {
+            throw new BadRequestException("Failed to verify appointment with ID " + request.getAppointmentId() + ": " + e.getMessage());
         }
 
         // Verify patient exists
