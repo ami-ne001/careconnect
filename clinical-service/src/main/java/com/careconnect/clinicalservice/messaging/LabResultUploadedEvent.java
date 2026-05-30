@@ -10,8 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LabResultUploadedEvent {
-    private Long labRequestId;
     private Long labResultId;
+    private Long labRequestId;
     private Long patientId;
+    private Long doctorId;
     private String testType;
+    private Long technicianId;
 }

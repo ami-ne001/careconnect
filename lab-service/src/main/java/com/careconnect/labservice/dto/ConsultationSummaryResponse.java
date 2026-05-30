@@ -1,4 +1,4 @@
-package com.careconnect.patientservice.messaging;
+package com.careconnect.labservice.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,11 +9,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LabResultUploadedEvent {
-    private Long labResultId;
-    private Long labRequestId;
+public class ConsultationSummaryResponse {
+    private Long id;
     private Long patientId;
     private Long doctorId;
-    private String testType;
-    private Long technicianId;
+    private String status;
 }

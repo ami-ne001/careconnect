@@ -1,4 +1,4 @@
-package com.careconnect.patientservice.messaging;
+package com.careconnect.labservice.messaging;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

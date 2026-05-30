@@ -1,19 +1,20 @@
-package com.careconnect.patientservice.messaging;
+package com.careconnect.billingservice.messaging;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LabResultUploadedEvent {
-    private Long labResultId;
-    private Long labRequestId;
+public class ConsultationClosedEvent {
+    private Long consultationId;
     private Long patientId;
     private Long doctorId;
-    private String testType;
-    private Long technicianId;
+    private String diagnosis;
+    private BigDecimal consultationFee;
 }
