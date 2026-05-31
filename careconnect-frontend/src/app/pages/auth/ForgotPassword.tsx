@@ -1,15 +1,28 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Mail, CheckCircle } from "lucide-react";
+import { authApi } from "@/api";
+import { toast } from "sonner";
 
 export function ForgotPassword() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
+    setIsLoading(true);
+    try {
+      await authApi.forgotPassword(email);
+      setSent(true);
+      toast.success("Reset link sent successfully!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || err.message || "Failed to request password reset.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -48,10 +61,18 @@ export function ForgotPassword() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full h-11 rounded-lg text-white text-sm font-semibold transition-all hover:opacity-90"
+                  disabled={isLoading}
+                  className="w-full h-11 rounded-lg text-white text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   style={{ background: "#1E3A5F" }}
                 >
-                  Send Reset Link
+                  {isLoading ? (
+                    <>
+                      <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Sending Link...
+                    </>
+                  ) : (
+                    "Send Reset Link"
+                  )}
                 </button>
               </form>
             </>

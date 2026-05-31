@@ -46,9 +46,10 @@ function Breadcrumb() {
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const token = localStorage.getItem("cc_token");
   const role = localStorage.getItem("cc_role");
-
-  if (!role) {
+  
+  if (!token || !role) {
     return <Navigate to="/auth/login" replace />;
   }
 
