@@ -1,3 +1,5 @@
 export { api, TOKEN_KEY } from './axios';
-export { authApi } from './auth.api';
-export { adminApi } from './admin.api';
+export * from './auth.api';
+export * from './admin.api';
+export * from './patient.api';
+export * from './receptionist.api';
