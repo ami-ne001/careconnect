@@ -89,6 +89,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const handleLogout = () => {
     localStorage.removeItem("cc_role");
     localStorage.removeItem("cc_user");
+    localStorage.removeItem("cc_token");
+    localStorage.removeItem("cc_userId");
+    localStorage.removeItem("cc_email");
+    localStorage.removeItem("cc_firstName");
+    localStorage.removeItem("cc_lastName");
+    localStorage.removeItem("cc-auth");
+    window.dispatchEvent(new Event("cc-auth-change"));
     navigate("/auth/login");
   };
 

@@ -1,38 +1,54 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Eye, EyeOff, Cross } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/store/useAuth";
+import { toast } from "sonner";
 
 const roleRoutes: Record<string, string> = {
-  Admin: "/admin/dashboard",
-  Doctor: "/doctor/dashboard",
-  Nurse: "/nurse/dashboard",
-  Receptionist: "/receptionist/dashboard",
-  Patient: "/patient/dashboard",
-  "Lab Technician": "/lab/dashboard",
+  ADMIN: "/admin/dashboard",
+  DOCTOR: "/doctor/dashboard",
+  NURSE: "/nurse/dashboard",
+  RECEPTIONIST: "/receptionist/dashboard",
+  PATIENT: "/patient/dashboard",
+  LAB_TECHNICIAN: "/lab/dashboard",
 };
 
-const roleUsers: Record<string, string> = {
-  Admin: "David Nguyen",
-  Doctor: "Dr. Sarah Mitchell",
-  Nurse: "Nurse Linda Torres",
-  Receptionist: "Emma Roberts",
-  Patient: "Ahmed Al-Farsi",
-  "Lab Technician": "Priya Nair",
-};
+const displayRoles = [
+  { label: "Admin", value: "ADMIN", defaultEmail: "admin@careconnect.com" },
+  { label: "Doctor", value: "DOCTOR", defaultEmail: "doctor@careconnect.com" },
+  { label: "Nurse", value: "NURSE", defaultEmail: "nurse@careconnect.com" },
+  { label: "Receptionist", value: "RECEPTIONIST", defaultEmail: "receptionist@careconnect.com" },
+  { label: "Patient", value: "PATIENT", defaultEmail: "patient@careconnect.com" },
+  { label: "Lab Technician", value: "LAB_TECHNICIAN", defaultEmail: "lab@careconnect.com" },
+];
 
 export function Login() {
   const navigate = useNavigate();
-  const [role, setRole] = useState("Admin");
-  const [email, setEmail] = useState("admin@careconnect.com");
-  const [password, setPassword] = useState("••••••••");
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("cc_role", role);
-    localStorage.setItem("cc_user", roleUsers[role]);
-    navigate(roleRoutes[role] || "/admin/dashboard");
+    setIsLoading(true);
+    try {
+      const userRole = await login(email, password);
+      // Map database role to uppercase to set the storage variables correctly
+      localStorage.setItem("cc_role", userRole === "LAB_TECHNICIAN" ? "Lab Technician" : userRole.charAt(0) + userRole.slice(1).toLowerCase());
+      const firstName = localStorage.getItem("cc_firstName") || "";
+      const lastName = localStorage.getItem("cc_lastName") || "";
+      localStorage.setItem("cc_user", `${firstName} ${lastName}`.trim() || "User");
+      toast.success("Successfully logged in!");
+      navigate(roleRoutes[userRole] || "/admin/dashboard");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || err.message || "Failed to sign in. Please verify your credentials.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -111,24 +127,6 @@ export function Login() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Role selector */}
-            <div>
-              <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Role</label>
-              <select
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  setEmail(`${e.target.value.toLowerCase().replace(/\s/g, ".")}@careconnect.com`);
-                }}
-                className="w-full h-11 px-3 rounded-lg border border-[#E2E8F0] bg-white text-[#0F172A] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent appearance-none"
-                style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748B' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
-              >
-                {Object.keys(roleRoutes).map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
-
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Email Address</label>
@@ -180,10 +178,18 @@ export function Login() {
 
             <button
               type="submit"
-              className="w-full h-11 rounded-lg text-white text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+              disabled={isLoading}
+              className="w-full h-11 rounded-lg text-white text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{ background: "#1E3A5F" }}
             >
-              Sign In
+              {isLoading ? (
+                <>
+                  <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  Signing In...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
           </form>
 

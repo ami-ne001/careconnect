@@ -1,118 +1,277 @@
-import { useState } from "react";
-import { Plus, Edit2, Users, Heart, Brain, Bone, Baby, Zap, FlaskConical } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Plus, Edit2, Trash2, ShieldAlert } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { Badge } from "../../components/ui/Badge";
-
-const departments = [
-  { name: "Cardiology", head: "Dr. Emily Ross", staff: 12, patients: 89, color: "bg-red-100", iconColor: "text-red-500", icon: <Heart size={22} /> },
-  { name: "Neurology", head: "Dr. Alan Park", staff: 9, patients: 67, color: "bg-purple-100", iconColor: "text-purple-500", icon: <Brain size={22} /> },
-  { name: "Orthopedics", head: "Dr. Sarah Lane", staff: 11, patients: 74, color: "bg-blue-100", iconColor: "text-blue-500", icon: <Bone size={22} /> },
-  { name: "Pediatrics", head: "Dr. Mark Chen", staff: 14, patients: 103, color: "bg-green-100", iconColor: "text-green-500", icon: <Baby size={22} /> },
-  { name: "Emergency", head: "Dr. Lisa Park", staff: 18, patients: 142, color: "bg-orange-100", iconColor: "text-orange-500", icon: <Zap size={22} /> },
-  { name: "Laboratory", head: "Dr. Tom Hill", staff: 6, patients: null, color: "bg-cyan-100", iconColor: "text-cyan-500", icon: <FlaskConical size={22} /> },
-];
-
-const staffData = [
-  { name: "Dr. Emily Ross", role: "Head of Department", dept: "Cardiology", status: "active" },
-  { name: "Dr. James Holloway", role: "Senior Cardiologist", dept: "Cardiology", status: "active" },
-  { name: "Nurse Sofia Vargas", role: "Cardiac Nurse", dept: "Cardiology", status: "active" },
-  { name: "Nurse Chen Wei", role: "Cardiac Nurse", dept: "Cardiology", status: "active" },
-  { name: "Dr. Michael Torres", role: "Cardiologist", dept: "Cardiology", status: "inactive" },
-];
+import { adminApi } from "@/api";
+import { getApiErrorMessage } from "@/utils/apiError";
+import { toast } from "sonner";
+import type { Department, DepartmentCreateRequest, DepartmentUpdateRequest } from "@/types";
 
 export function AdminDepartments() {
-  const [selected, setSelected] = useState("Cardiology");
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  // Form Fields
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [formLoading, setFormLoading] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const loadDepartments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await adminApi.getDepartments();
+      setDepartments(data);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to load departments."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDepartments();
+  }, [loadDepartments]);
+
+  const openCreate = () => {
+    setFormMode("create");
+    setEditingId(null);
+    setName("");
+    setDescription("");
+    setFormOpen(true);
+  };
+
+  const openEdit = (dept: Department) => {
+    setFormMode("edit");
+    setEditingId(dept.id);
+    setName(dept.name);
+    setDescription(dept.description || "");
+    setFormOpen(true);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      toast.error("Department name is required.");
+      return;
+    }
+
+    setFormLoading(true);
+    const body: DepartmentCreateRequest = {
+      name: name.trim(),
+      description: description.trim() || undefined,
+    };
+
+    try {
+      if (formMode === "create") {
+        await adminApi.createDepartment(body);
+        toast.success("Department created successfully!");
+      } else if (editingId != null) {
+        await adminApi.updateDepartment(editingId, body as DepartmentUpdateRequest);
+        toast.success("Department updated successfully!");
+      }
+      setFormOpen(false);
+      await loadDepartments();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to save department."));
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      await adminApi.deleteDepartment(deleteTarget.id);
+      toast.success(`Department "${deleteTarget.name}" deleted.`);
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+      await loadDepartments();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to delete department."));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   return (
     <div>
       <PageHeader
         title="Departments"
-        subtitle="Manage hospital departments and staff assignments"
+        subtitle="Manage hospital departments and units"
         actions={
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90">
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90 cursor-pointer"
+          >
             <Plus size={15} />Create Department
           </button>
         }
       />
 
-      {/* Department cards grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mb-7">
-        {departments.map((dept) => (
-          <div
-            key={dept.name}
-            onClick={() => setSelected(dept.name)}
-            className={`bg-white rounded-xl p-5 border-2 cursor-pointer transition-all hover:shadow-md ${selected === dept.name ? "border-[#0EA5E9]" : "border-[#E2E8F0]"}`}
-            style={{ boxShadow: selected === dept.name ? "0 4px 16px rgba(14,165,233,0.15)" : "0 2px 8px rgba(0,0,0,0.06)" }}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-12 h-12 rounded-xl ${dept.color} ${dept.iconColor} flex items-center justify-center`}>
-                {dept.icon}
+      {/* Grid List */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <span className="animate-spin rounded-full h-8 w-8 border-4 border-[#1E3A5F] border-t-transparent" />
+          <span className="text-sm text-[#64748B]">Loading departments...</span>
+        </div>
+      ) : departments.length === 0 ? (
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center text-[#64748B]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+          No departments set up yet. Click "Create Department" to add one.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mb-7">
+          {departments.map((dept) => (
+            <div
+              key={dept.id}
+              className="bg-white rounded-xl p-5 border border-[#E2E8F0] transition-all hover:shadow-md flex flex-col justify-between"
+              style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+            >
+              <div>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#1E3A5F] flex items-center justify-center font-bold text-lg">
+                    {dept.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEdit(dept)}
+                      className="w-8 h-8 rounded-lg border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC] cursor-pointer"
+                      title="Edit Department"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDeleteTarget(dept);
+                        setDeleteOpen(true);
+                      }}
+                      className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-600 hover:bg-red-50 cursor-pointer"
+                      title="Delete Department"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+                <h3 className="font-semibold text-[#0F172A] mb-1">{dept.name}</h3>
+                <p className="text-sm text-[#64748B] line-clamp-3 mb-4">{dept.description || "No description provided."}</p>
               </div>
-              <div className="flex gap-2">
-                <button className="w-8 h-8 rounded-lg border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC]">
-                  <Edit2 size={13} />
-                </button>
-                <button className="w-8 h-8 rounded-lg border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC]">
-                  <Users size={13} />
-                </button>
+              <div className="text-[11px] text-[#94A3B8] border-t border-[#F1F5F9] pt-3">
+                Created: {new Date(dept.createdAt).toLocaleDateString()}
               </div>
             </div>
-            <h3 className="font-semibold text-[#0F172A] mb-1">{dept.name}</h3>
-            <p className="text-xs text-[#64748B] mb-3">{dept.head}</p>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1.5">
-                <Users size={14} className="text-[#94A3B8]" />
-                <span className="font-semibold text-[#0F172A]">{dept.staff}</span>
-                <span className="text-[#64748B]">staff</span>
+          ))}
+        </div>
+      )}
+
+      {/* Edit/Create slide-over */}
+      {formOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/35 backdrop-blur-xs" onClick={() => !formLoading && setFormOpen(false)} />
+          <div className="w-96 bg-white h-full shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+              <h3 className="font-semibold text-[#0F172A]">{formMode === "create" ? "Create Department" : "Edit Department"}</h3>
+              <button disabled={formLoading} onClick={() => setFormOpen(false)} className="cursor-pointer">
+                <Plus size={18} className="text-[#64748B] rotate-45" />
+              </button>
+            </div>
+            <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col justify-between">
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Department Name</label>
+                  <input
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Cardiology"
+                    className="w-full h-11 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Description</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter department specialty, services, etc..."
+                    rows={4}
+                    className="w-full p-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                  />
+                </div>
               </div>
-              <div className="w-px h-4 bg-[#E2E8F0]" />
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-[#0F172A]">{dept.patients ?? "—"}</span>
-                <span className="text-[#64748B]">{dept.patients ? "patients" : ""}</span>
+              <div className="px-6 py-4 border-t border-[#E2E8F0] flex gap-3 bg-gray-50">
+                <button
+                  type="button"
+                  disabled={formLoading}
+                  onClick={() => setFormOpen(false)}
+                  className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B] hover:bg-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="flex-1 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {formLoading ? (
+                    <>
+                      <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save"
+                  )}
+                </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteOpen && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => !deleteLoading && setDeleteOpen(false)} />
+          <div className="relative bg-white rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <ShieldAlert size={28} />
+              <h3 className="text-lg font-bold text-[#0F172A]">Delete Department</h3>
+            </div>
+            <p className="text-sm text-[#64748B] leading-relaxed">
+              Are you sure you want to delete the department <strong>"{deleteTarget.name}"</strong>?
+              This action cannot be undone. Any active staff assigned to this department will no longer be linked to it.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                disabled={deleteLoading}
+                onClick={() => setDeleteOpen(false)}
+                className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B] hover:bg-[#F8FAFC] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleteLoading}
+                onClick={handleDelete}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 cursor-pointer flex items-center gap-2"
+              >
+                {deleteLoading ? (
+                  <>
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Department"
+                )}
+              </button>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Staff table for selected dept */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-        <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
-          <h3 className="font-semibold text-[#0F172A]">{selected} — Department Staff</h3>
-          <span className="text-sm text-[#64748B]">{staffData.length} members</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                {["Staff Member", "Role", "Department", "Status", "Actions"].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {staffData.map((s, i) => (
-                <tr key={i} className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center text-white text-xs font-semibold">
-                        {s.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                      </div>
-                      <span className="font-medium text-[#0F172A]">{s.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-[#64748B]">{s.role}</td>
-                  <td className="px-5 py-3.5 text-[#64748B]">{s.dept}</td>
-                  <td className="px-5 py-3.5"><Badge variant={s.status === "active" ? "active" : "inactive"} dot>{s.status}</Badge></td>
-                  <td className="px-5 py-3.5">
-                    <button className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0F172A] hover:bg-[#F0F4F8]">View Profile</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
