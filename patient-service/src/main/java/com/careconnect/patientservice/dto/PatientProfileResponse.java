@@ -11,6 +11,8 @@ import java.util.List;
 public class PatientProfileResponse {
     private Long id;
     private Long userId;
+    private String firstName;
+    private String lastName;
     private String bloodType;
     private String nationalId;
     private String insuranceProvider;

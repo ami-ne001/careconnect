@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Calendar, Clock, User, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
-import { appointmentApi, adminApi } from "@/api";
+import { appointmentApi, receptionistApi } from "@/api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -52,15 +52,21 @@ export function DoctorAppointments() {
       .catch((err) => toast.error(getApiErrorMessage(err, "Failed to load appointments.")))
       .finally(() => setLoading(false));
 
-    // Try to load patient names separately — may fail if doctor lacks admin access
-    adminApi
-      .getUsers("PATIENT")
+    // Load patient names through patient profiles endpoint (accessible to DOCTOR)
+    receptionistApi
+      .getPatientsList(0, 1000)
       .then(({ data }) => {
         const map: Record<number, string> = {};
-        (data || []).forEach((p) => { map[p.id] = `${p.firstName} ${p.lastName}`; });
+        (data.content || []).forEach((p) => {
+          if (p.userId) {
+            map[p.userId] = `${p.firstName || ""} ${p.lastName || ""}`.trim() || `Patient #${p.userId}`;
+          }
+        });
         setPatients(map);
       })
-      .catch(() => {/* silently ignore — patient names show as Patient #id */});
+      .catch((err) => {
+        console.warn("Failed to fetch patients:", err);
+      });
   };
 
   useEffect(() => {

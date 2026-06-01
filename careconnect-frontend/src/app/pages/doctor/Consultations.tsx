@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Stethoscope, FlaskConical, Pill, CheckCircle, RefreshCw, Plus, X, ChevronDown } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
-import { appointmentApi, adminApi } from "@/api";
+import { appointmentApi, receptionistApi } from "@/api";
 import { clinicalApi } from "@/api/clinical.api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
@@ -54,7 +54,7 @@ export function DoctorConsultations() {
   // ── Prescription form ─────────────────────────────────────────
   const [showRx, setShowRx] = useState(false);
   const [rxItems, setRxItems] = useState<PrescriptionItemDto[]>([
-    { medicationName: "", dosage: "", frequency: "", durationDays: 7, instructions: "" },
+    { medication: "", dosage: "", frequency: "", durationDays: 7, quantity: 1, instructions: "" },
   ]);
   const [rxNotes, setRxNotes] = useState("");
   const [savingRx, setSavingRx] = useState(false);
@@ -78,11 +78,15 @@ export function DoctorConsultations() {
       .catch((err) => toast.error(getApiErrorMessage(err, "Failed to load queue.")))
       .finally(() => setLoadingQueue(false));
 
-    // Try loading patients separately to avoid failing the whole load on a 403/permission error
-    adminApi.getUsers("PATIENT")
-      .then(({ data: patientList }) => {
+    // Load patient names through patient profiles endpoint (accessible to DOCTOR)
+    receptionistApi.getPatientsList(0, 1000)
+      .then(({ data }) => {
         const map: Record<number, string> = {};
-        (patientList || []).forEach((p) => { map[p.id] = `${p.firstName} ${p.lastName}`; });
+        (data.content || []).forEach((p) => {
+          if (p.userId) {
+            map[p.userId] = `${p.firstName || ""} ${p.lastName || ""}`.trim() || `Patient #${p.userId}`;
+          }
+        });
         setPatients(map);
       })
       .catch((err) => {
@@ -188,78 +192,76 @@ export function DoctorConsultations() {
 
   // ── Save & Close consultation ──────────────────────────────────
   const closeConsultation = async () => {
-    if (!consultation || !activeAppt) return;
+    if (!consultation || !activeAppt || !userId) return;
+
+    // Validate prescription if any medication is typed
+    const hasMedication = rxItems.some((it) => it.medication.trim());
+    if (hasMedication) {
+      const valid = rxItems.every(
+        (it) => it.medication.trim() && it.dosage.trim() && it.frequency.trim()
+      );
+      if (!valid) {
+        toast.error("Please fill in medication name, dosage, and frequency for all prescribed items.");
+        return;
+      }
+    }
+
     setClosing(true);
     try {
+      // 1. Save Vitals if any values are entered
+      const hasVitals = Object.values(vitals).some((v) => v.trim() !== "");
+      if (hasVitals) {
+        const req: VitalsCreateRequest = {
+          patientId: activeAppt.patientId,
+          consultationId: consultation.id,
+          bpSystolic: vitals.bpSystolic ? parseInt(vitals.bpSystolic) : undefined,
+          bpDiastolic: vitals.bpDiastolic ? parseInt(vitals.bpDiastolic) : undefined,
+          heartRate: vitals.heartRate ? parseInt(vitals.heartRate) : undefined,
+          temperature: vitals.temperature ? parseFloat(vitals.temperature) : undefined,
+          oxygenSat: vitals.oxygenSat ? parseFloat(vitals.oxygenSat) : undefined,
+          weightKg: vitals.weightKg ? parseFloat(vitals.weightKg) : undefined,
+        };
+        await clinicalApi.recordVitals(req);
+      }
+
+      // 2. Save Prescription if medications are specified
+      if (hasMedication) {
+        await clinicalApi.createPrescription({
+          consultationId: consultation.id,
+          patientId: activeAppt.patientId,
+          notes: rxNotes,
+          items: rxItems.map((it) => ({
+            ...it,
+            quantity: it.quantity || 1, // ensure quantity is specified
+          })),
+        });
+      }
+
+      // 3. Update Consultation (symptoms, diagnosis, clinical notes, and close it)
       await clinicalApi.updateConsultation(consultation.id, {
         symptoms: symptoms.join(", "),
         diagnosis,
         clinicalNotes,
         status: "CLOSED",
       });
-      await appointmentApi.updateAppointmentStatus(activeAppt.id, "COMPLETED");
-      toast.success("Consultation closed. Appointment marked as completed.");
 
-      // Reset
+      // 4. Update appointment status to completed
+      await appointmentApi.updateAppointmentStatus(activeAppt.id, "COMPLETED");
+
+      toast.success("Consultation saved and marked as completed successfully.");
+
+      // Reset workspace
       setActiveQueue(null);
       setActiveAppt(null);
       setConsultation(null);
+      setVitals({ bpSystolic: "", bpDiastolic: "", heartRate: "", temperature: "", oxygenSat: "", weightKg: "" });
+      setRxItems([{ medication: "", dosage: "", frequency: "", durationDays: 7, quantity: 1, instructions: "" }]);
+      setRxNotes("");
       loadQueue();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Failed to close consultation."));
+      toast.error(getApiErrorMessage(err, "Failed to complete consultation."));
     } finally {
       setClosing(false);
-    }
-  };
-
-  // ── Save Vitals ───────────────────────────────────────────────
-  const saveVitals = async () => {
-    if (!activeAppt || !consultation) return;
-    setSavingVitals(true);
-    try {
-      const req: VitalsCreateRequest = {
-        patientId: activeAppt.patientId,
-        consultationId: consultation.id,
-        bpSystolic: vitals.bpSystolic ? parseInt(vitals.bpSystolic) : undefined,
-        bpDiastolic: vitals.bpDiastolic ? parseInt(vitals.bpDiastolic) : undefined,
-        heartRate: vitals.heartRate ? parseInt(vitals.heartRate) : undefined,
-        temperature: vitals.temperature ? parseFloat(vitals.temperature) : undefined,
-        oxygenSat: vitals.oxygenSat ? parseFloat(vitals.oxygenSat) : undefined,
-        weightKg: vitals.weightKg ? parseFloat(vitals.weightKg) : undefined,
-      };
-      await clinicalApi.recordVitals(req);
-      toast.success("Vitals recorded successfully.");
-      setShowVitals(false);
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, "Failed to record vitals."));
-    } finally {
-      setSavingVitals(false);
-    }
-  };
-
-  // ── Save Prescription ─────────────────────────────────────────
-  const savePrescription = async () => {
-    if (!activeAppt || !consultation) return;
-    const valid = rxItems.every((it) => it.medicationName && it.dosage && it.frequency);
-    if (!valid) {
-      toast.error("Please fill in all required prescription fields.");
-      return;
-    }
-    setSavingRx(true);
-    try {
-      await clinicalApi.createPrescription({
-        consultationId: consultation.id,
-        patientId: activeAppt.patientId,
-        notes: rxNotes,
-        items: rxItems,
-      });
-      toast.success("Prescription written successfully.");
-      setShowRx(false);
-      setRxItems([{ medicationName: "", dosage: "", frequency: "", durationDays: 7, instructions: "" }]);
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, "Failed to write prescription."));
-    } finally {
-      setSavingRx(false);
     }
   };
 
@@ -549,14 +551,7 @@ export function DoctorConsultations() {
                             </div>
                           ))}
                         </div>
-                        <button
-                          onClick={saveVitals}
-                          disabled={savingVitals}
-                          className="w-full h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2 transition-colors"
-                        >
-                          {savingVitals && <RefreshCw size={14} className="animate-spin" />}
-                          Save Vitals
-                        </button>
+                        <p className="text-xs text-[#94A3B8] italic">Vitals will be saved when you complete the consultation.</p>
                       </div>
                     )}
                   </div>
@@ -596,11 +591,11 @@ export function DoctorConsultations() {
                             </p>
                             <div className="grid grid-cols-2 gap-2">
                               <input
-                                value={item.medicationName}
+                                value={item.medication}
                                 onChange={(e) =>
                                   setRxItems((prev) =>
                                     prev.map((it, i) =>
-                                      i === idx ? { ...it, medicationName: e.target.value } : it
+                                      i === idx ? { ...it, medication: e.target.value } : it
                                     )
                                   )
                                 }
@@ -648,6 +643,22 @@ export function DoctorConsultations() {
                                 className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
                               />
                               <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  setRxItems((prev) =>
+                                    prev.map((it, i) =>
+                                      i === idx
+                                        ? { ...it, quantity: parseInt(e.target.value) || 1 }
+                                        : it
+                                    )
+                                  )
+                                }
+                                placeholder="Quantity *"
+                                min={1}
+                                className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                              />
+                              <input
                                 value={item.instructions || ""}
                                 onChange={(e) =>
                                   setRxItems((prev) =>
@@ -666,7 +677,7 @@ export function DoctorConsultations() {
                           onClick={() =>
                             setRxItems((prev) => [
                               ...prev,
-                              { medicationName: "", dosage: "", frequency: "", durationDays: 7 },
+                              { medication: "", dosage: "", frequency: "", durationDays: 7, quantity: 1 },
                             ])
                           }
                           className="flex items-center gap-1 text-xs text-[#0EA5E9] font-semibold cursor-pointer hover:opacity-80"
@@ -679,14 +690,7 @@ export function DoctorConsultations() {
                           placeholder="Prescription notes (optional)"
                           className="w-full h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
                         />
-                        <button
-                          onClick={savePrescription}
-                          disabled={savingRx}
-                          className="w-full h-10 rounded-lg bg-[#10B981] text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2 transition-colors"
-                        >
-                          {savingRx && <RefreshCw size={14} className="animate-spin" />}
-                          Submit Prescription
-                        </button>
+                        <p className="text-xs text-[#94A3B8] italic">Prescription will be submitted when you complete the consultation.</p>
                       </div>
                     )}
                   </div>

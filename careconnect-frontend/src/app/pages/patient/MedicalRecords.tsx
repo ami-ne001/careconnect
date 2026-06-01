@@ -62,7 +62,7 @@ export function PatientMedicalRecords() {
 
         // 2. Map Prescriptions
         prescriptions.forEach((p) => {
-          const itemsSummary = p.items.map(item => `${item.medicationName} (${item.dosage} · ${item.frequency})`).join(", ");
+          const itemsSummary = p.items.map(item => `${item.medication} (${item.dosage} · ${item.frequency})`).join(", ");
           items.push({
             id: p.id,
             type: "Prescription",

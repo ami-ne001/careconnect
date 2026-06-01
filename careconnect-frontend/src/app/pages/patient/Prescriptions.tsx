@@ -78,7 +78,7 @@ export function PatientPrescriptions() {
                         <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Medications</p>
                         {p.items.map((item, idx) => (
                           <div key={idx} className="bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-lg text-xs">
-                            <p className="font-bold text-[#0F172A] mb-0.5">{item.medicationName}</p>
+                            <p className="font-bold text-[#0F172A] mb-0.5">{item.medication}</p>
                             <div className="flex justify-between text-[#64748B] mt-1">
                               <span>Dosage: {item.dosage}</span>
                               <span>Frequency: {item.frequency}</span>
@@ -126,7 +126,7 @@ export function PatientPrescriptions() {
                       {history.map((h, i) => {
                         const dt = new Date(h.prescribedDate);
                         const formattedDate = dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-                        const medsSummary = h.items.map(item => `${item.medicationName} (${item.dosage})`).join(", ");
+                        const medsSummary = h.items.map(item => `${item.medication} (${item.dosage})`).join(", ");
 
                         return (
                           <tr key={h.id} className={`border-b border-[#F1F5F9] hover:bg-[#FAFBFC] ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}>

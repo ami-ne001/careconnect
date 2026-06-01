@@ -28,6 +28,8 @@ export interface ChronicConditionResponse {
 export interface PatientProfileResponse {
   id: number;
   userId: number;
+  firstName?: string;
+  lastName?: string;
   bloodType?: string;
   nationalId?: string;
   insuranceProvider?: string;

@@ -238,9 +238,23 @@ public class PatientProfileService {
                 .map(this::mapConditionToResponse)
                 .collect(Collectors.toList());
 
+        String firstName = "";
+        String lastName = "";
+        try {
+            UserSummaryResponse userSummary = authServiceClient.getUserSummary(profile.getUserId());
+            if (userSummary != null) {
+                firstName = userSummary.getFirstName();
+                lastName = userSummary.getLastName();
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch user summary from auth-service for user ID: {}", profile.getUserId(), e);
+        }
+
         return PatientProfileResponse.builder()
                 .id(profile.getId())
                 .userId(profile.getUserId())
+                .firstName(firstName)
+                .lastName(lastName)
                 .bloodType(profile.getBloodType())
                 .nationalId(profile.getNationalId())
                 .insuranceProvider(profile.getInsuranceProvider())

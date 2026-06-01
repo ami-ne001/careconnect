@@ -64,10 +64,11 @@ export interface VitalsCreateRequest {
 
 // ── Prescription ──────────────────────────────────────────────────
 export interface PrescriptionItemDto {
-  medicationName: string;
+  medication: string;
   dosage: string;
   frequency: string;
   durationDays: number;
+  quantity: number;
   instructions?: string;
 }
 
