@@ -42,7 +42,7 @@ public class ConsultationController {
     }
 
     @GetMapping("/patient/{patientId}")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN', 'PATIENT')")
     public ResponseEntity<List<ConsultationResponse>> getConsultationsByPatient(@PathVariable Long patientId) {
         return ResponseEntity.ok(consultationService.getConsultationsByPatient(patientId));
     }

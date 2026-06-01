@@ -8,3 +8,4 @@ export type {
   UserCreateRequest,
   UserUpdateRequest,
 } from './admin.types';
+export * from './patient.types';

@@ -30,13 +30,13 @@ public class MedicalDocumentController {
     }
 
     @GetMapping("/patient/{patientId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN', 'PATIENT')")
     public ResponseEntity<List<MedicalDocumentResponse>> getDocumentsByPatientId(@PathVariable Long patientId) {
         return ResponseEntity.ok(medicalDocumentService.getDocumentsByPatientId(patientId));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN', 'PATIENT')")
     public ResponseEntity<MedicalDocumentResponse> getDocumentById(@PathVariable Long id) {
         return ResponseEntity.ok(medicalDocumentService.getDocumentById(id));
     }

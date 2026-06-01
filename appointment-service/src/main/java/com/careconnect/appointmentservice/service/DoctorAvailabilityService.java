@@ -83,10 +83,11 @@ public class DoctorAvailabilityService {
         // 2. Get availability for the day of week
         DayOfWeek dayOfWeek = DayOfWeek.valueOf(date.getDayOfWeek().name());
         Optional<DoctorAvailability> availabilityOpt = availabilityRepository.findByDoctorIdAndDayOfWeek(doctorId, dayOfWeek);
+        // If no availability record in DB for this doctor/day combination, return no slots.
+        // Admins/Doctors must set availability via POST /api/availability first.
         if (availabilityOpt.isEmpty()) {
-            return slots; // no availability set for this day
+            return slots; // no DB record → doctor is not available this day
         }
-
         DoctorAvailability availability = availabilityOpt.get();
         LocalTime workStart = availability.getStartTime();
         LocalTime workEnd = availability.getEndTime();

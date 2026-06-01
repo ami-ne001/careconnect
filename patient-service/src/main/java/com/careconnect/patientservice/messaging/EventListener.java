@@ -24,7 +24,7 @@ public class EventListener {
     public void handleAppointmentConfirmed(AppointmentConfirmedEvent event) {
         log.info("Received AppointmentConfirmedEvent: {}", event);
         try {
-            PatientProfile profile = patientProfileRepository.findById(event.getPatientId()).orElse(null);
+            PatientProfile profile = patientProfileRepository.findByUserId(event.getPatientId()).orElse(null);
             if (profile != null) {
                 Notification notification = Notification.builder()
                         .userId(profile.getUserId())
@@ -37,7 +37,7 @@ public class EventListener {
                 notificationRepository.save(notification);
                 log.info("Notification created for user ID: {} regarding appointment ID: {}", profile.getUserId(), event.getAppointmentId());
             } else {
-                log.warn("Patient profile not found for ID: {}, cannot send appointment notification", event.getPatientId());
+                log.warn("Patient profile not found for user ID: {}, cannot send appointment notification", event.getPatientId());
             }
         } catch (Exception e) {
             log.error("Error processing AppointmentConfirmedEvent: ", e);

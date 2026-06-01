@@ -127,7 +127,7 @@ export function AdminDepartments() {
           No departments set up yet. Click "Create Department" to add one.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mb-7">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-7">
           {departments.map((dept) => (
             <div
               key={dept.id}
