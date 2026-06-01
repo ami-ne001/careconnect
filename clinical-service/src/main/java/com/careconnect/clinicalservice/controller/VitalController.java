@@ -28,13 +28,13 @@ public class VitalController {
     }
 
     @GetMapping("/patient/{patientId}")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN', 'PATIENT')")
     public ResponseEntity<List<VitalsResponse>> getVitalsByPatient(@PathVariable Long patientId) {
         return ResponseEntity.ok(vitalService.getVitalsByPatient(patientId));
     }
 
     @GetMapping("/patient/{patientId}/latest")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN', 'PATIENT')")
     public ResponseEntity<VitalsResponse> getLatestVitalsByPatient(@PathVariable Long patientId) {
         return ResponseEntity.ok(vitalService.getLatestVitalsByPatient(patientId));
     }

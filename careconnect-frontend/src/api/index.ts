@@ -3,3 +3,7 @@ export * from './auth.api';
 export * from './admin.api';
 export * from './patient.api';
 export * from './receptionist.api';
+export * from './appointment.api';
+export * from './clinical.api';
+export * from './billing.api';
+export * from './lab.api';

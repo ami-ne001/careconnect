@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Calendar, Pill, FlaskConical, CreditCard } from "lucide-react";
 import { StatCard } from "../../components/ui/StatCard";
-import { patientApi } from "@/api";
+import { patientApi, authApi } from "@/api";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { toast } from "sonner";
-import type { PatientProfileResponse } from "@/types";
+import { useAuth } from "@/store/useAuth";
+import type { PatientProfileResponse, AdminUser } from "@/types";
 
 const tips = [
   "💧 Drink at least 8 glasses of water daily to stay hydrated.",
@@ -14,18 +15,22 @@ const tips = [
 ];
 
 export function PatientDashboard() {
+  const { userId } = useAuth();
   const [profile, setProfile] = useState<PatientProfileResponse | null>(null);
+  const [userInfo, setUserInfo] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const tipIdx = new Date().getDay() % tips.length;
 
   useEffect(() => {
-    const userIdRaw = localStorage.getItem("cc_userId");
-    if (!userIdRaw) return;
-    const userId = Number(userIdRaw);
+    if (!userId) return;
 
-    patientApi.getProfileByUserId(userId)
-      .then(({ data }) => {
-        setProfile(data);
+    Promise.all([
+      authApi.getMe(),
+      patientApi.getProfileByUserId(userId),
+    ])
+      .then(([{ data: user }, { data: pat }]) => {
+        setUserInfo(user);
+        setProfile(pat);
       })
       .catch((err) => {
         console.error(err);
@@ -34,9 +39,9 @@ export function PatientDashboard() {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [userId]);
 
-  const patientName = profile ? `${profile.firstName} ${profile.lastName}` : "Patient";
+  const patientName = userInfo ? `${userInfo.firstName} ${userInfo.lastName}` : "Patient";
 
   return (
     <div>
@@ -47,8 +52,8 @@ export function PatientDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-7">
         <StatCard title="Active Profile Status" value={profile ? "Verified" : "Pending"} subtitle={profile ? `Ref ID: #${profile.id}` : "Unregistered"} icon={<Calendar size={20} className="text-[#0EA5E9]" />} iconBg="bg-sky-50" />
-        <StatCard title="Active Allergies" value={profile ? String(profile.allergies.length) : "0"} subtitle="On file" icon={<Pill size={20} className="text-[#10B981]" />} iconBg="bg-emerald-50" />
-        <StatCard title="Chronic Conditions" value={profile ? String(profile.chronicConditions.length) : "0"} subtitle="Diagnosed" icon={<FlaskConical size={20} className="text-[#8B5CF6]" />} iconBg="bg-purple-50" />
+        <StatCard title="Active Allergies" value={profile ? String(profile.allergies?.length || 0) : "0"} subtitle="On file" icon={<Pill size={20} className="text-[#10B981]" />} iconBg="bg-emerald-50" />
+        <StatCard title="Chronic Conditions" value={profile ? String(profile.chronicConditions?.length || 0) : "0"} subtitle="Diagnosed" icon={<FlaskConical size={20} className="text-[#8B5CF6]" />} iconBg="bg-purple-50" />
         <StatCard title="Emergency Contact" value={profile?.emergencyContactName || "Not Set"} subtitle={profile?.emergencyContactPhone || "—"} icon={<CreditCard size={20} className="text-[#F59E0B]" />} iconBg="bg-amber-50" />
       </div>
 
@@ -60,15 +65,15 @@ export function PatientDashboard() {
             <div className="flex justify-center py-6">
               <span className="animate-spin rounded-full h-6 w-6 border-2 border-[#1E3A5F] border-t-transparent" />
             </div>
-          ) : profile ? (
+          ) : profile && userInfo ? (
             <div className="space-y-3.5 text-sm text-[#475569]">
               <div className="flex justify-between border-b border-[#F1F5F9] pb-2">
                 <span className="font-medium text-[#64748B]">Date of Birth:</span>
-                <span className="text-[#0F172A]">{profile.dateOfBirth}</span>
+                <span className="text-[#0F172A]">{userInfo.dateOfBirth || "—"}</span>
               </div>
               <div className="flex justify-between border-b border-[#F1F5F9] pb-2">
                 <span className="font-medium text-[#64748B]">Gender:</span>
-                <span className="text-[#0F172A]">{profile.gender}</span>
+                <span className="text-[#0F172A]">{userInfo.gender || "—"}</span>
               </div>
               <div className="flex justify-between border-b border-[#F1F5F9] pb-2">
                 <span className="font-medium text-[#64748B]">Blood Group:</span>
@@ -76,11 +81,11 @@ export function PatientDashboard() {
               </div>
               <div className="flex justify-between border-b border-[#F1F5F9] pb-2">
                 <span className="font-medium text-[#64748B]">Phone Number:</span>
-                <span className="text-[#0F172A]">{profile.phone || "—"}</span>
+                <span className="text-[#0F172A]">{userInfo.phone || "—"}</span>
               </div>
               <div className="flex justify-between pb-1">
                 <span className="font-medium text-[#64748B]">Residential Address:</span>
-                <span className="text-[#0F172A] text-right max-w-xs truncate">{profile.address || "—"}</span>
+                <span className="text-[#0F172A] text-right max-w-xs truncate">{userInfo.address || "—"}</span>
               </div>
             </div>
           ) : (

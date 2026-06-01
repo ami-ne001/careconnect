@@ -160,11 +160,21 @@ public class AppointmentService {
 
         DayOfWeek dayOfWeek = DayOfWeek.valueOf(date.getDayOfWeek().name());
         Optional<DoctorAvailability> availabilityOpt = availabilityRepository.findByDoctorIdAndDayOfWeek(doctorId, dayOfWeek);
+        DoctorAvailability availability;
         if (availabilityOpt.isEmpty()) {
-            throw new BadRequestException("Doctor has no availability set for " + dayOfWeek);
+            if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
+                throw new BadRequestException("Doctor has no availability set for weekends");
+            }
+            availability = DoctorAvailability.builder()
+                    .doctorId(doctorId)
+                    .dayOfWeek(dayOfWeek)
+                    .startTime(LocalTime.of(9, 0))
+                    .endTime(LocalTime.of(17, 0))
+                    .build();
+        } else {
+            availability = availabilityOpt.get();
         }
 
-        DoctorAvailability availability = availabilityOpt.get();
         LocalTime slotEnd = time.plusMinutes(durationMinutes);
         if (time.isBefore(availability.getStartTime()) || slotEnd.isAfter(availability.getEndTime())) {
             throw new BadRequestException("Requested time must fall within doctor's working hours: " 

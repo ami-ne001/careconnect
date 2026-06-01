@@ -39,8 +39,15 @@ public class AdminUserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'PATIENT', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN')")
     public ResponseEntity<List<UserResponse>> getAllUsers(@RequestParam(required = false) Role role) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdminOrReceptionist = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_RECEPTIONIST"));
+        if (!isAdminOrReceptionist && role != Role.DOCTOR) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Non-admin/receptionist users can only view DOCTOR profiles");
+        }
         return ResponseEntity.ok(adminUserService.getAllUsers(role));
     }
 
