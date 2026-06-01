@@ -55,6 +55,9 @@ export const appointmentApi = {
   getAllAppointments: (page = 0, size = 100) =>
     api.get<{ content: AppointmentResponse[] }>(`/api/appointments?page=${page}&size=${size}`),
 
+  getAppointmentsByDoctor: (doctorId: number) =>
+    api.get<AppointmentResponse[]>(`/api/appointments/doctor/${doctorId}`),
+
   createAppointment: (body: AppointmentCreateRequest) =>
     api.post<AppointmentResponse>("/api/appointments", body),
 

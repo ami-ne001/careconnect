@@ -51,11 +51,11 @@ export function PatientMedicalRecords() {
             id: c.id,
             type: "Consultation Notes",
             icon: "🩺",
-            dateStr: new Date(c.consultationDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-            dateObj: new Date(c.consultationDate),
-            doctor: `Dr. ${c.doctorName || "Physician"}`,
+            dateStr: new Date(c.startedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            dateObj: new Date(c.startedAt),
+            doctor: `Dr. #${c.doctorId}`,
             title: c.diagnosis || "General Consultation",
-            summary: `Chief Complaint: ${c.symptoms || "—"}\n\nClinical Notes: ${c.notes || "None recorded."}`,
+            summary: `Chief Complaint: ${c.symptoms || "—"}\n\nClinical Notes: ${c.clinicalNotes || "None recorded."}`,
             color: "bg-blue-100 text-blue-600"
           });
         });
@@ -69,7 +69,7 @@ export function PatientMedicalRecords() {
             icon: "💊",
             dateStr: new Date(p.prescribedDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
             dateObj: new Date(p.prescribedDate),
-            doctor: `Dr. ${p.doctorName || "Physician"}`,
+            doctor: `Dr. #${p.doctorId}`,
             title: `Medication Order #${p.id}`,
             summary: `Prescribed Medications: ${itemsSummary || "None listed."}\n\nStatus: ${p.status}`,
             color: "bg-green-100 text-green-600"

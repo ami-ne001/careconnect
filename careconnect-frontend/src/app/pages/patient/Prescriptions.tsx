@@ -68,7 +68,7 @@ export function PatientPrescriptions() {
                           <div className="w-12 h-12 rounded-xl bg-[#EFF6FF] flex items-center justify-center text-2xl">💊</div>
                           <div>
                             <h4 className="font-bold text-[#0F172A] text-sm">Order #{p.id}</h4>
-                            <p className="text-xs text-[#64748B]">Prescribed by Dr. {p.doctorName || "Physician"}</p>
+                            <p className="text-xs text-[#64748B]">Prescribed by Dr. #{p.doctorId}</p>
                           </div>
                         </div>
                         <Badge variant="active" dot>Active</Badge>
@@ -76,8 +76,8 @@ export function PatientPrescriptions() {
 
                       <div className="border-t border-[#F1F5F9] pt-3 space-y-3">
                         <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Medications</p>
-                        {p.items.map((item) => (
-                          <div key={item.id} className="bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-lg text-xs">
+                        {p.items.map((item, idx) => (
+                          <div key={idx} className="bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-lg text-xs">
                             <p className="font-bold text-[#0F172A] mb-0.5">{item.medicationName}</p>
                             <div className="flex justify-between text-[#64748B] mt-1">
                               <span>Dosage: {item.dosage}</span>
@@ -131,7 +131,7 @@ export function PatientPrescriptions() {
                         return (
                           <tr key={h.id} className={`border-b border-[#F1F5F9] hover:bg-[#FAFBFC] ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}>
                             <td className="px-5 py-3.5 font-semibold text-[#0EA5E9]">#{h.id}</td>
-                            <td className="px-5 py-3.5 text-[#64748B]">Dr. {h.doctorName || "Physician"}</td>
+                            <td className="px-5 py-3.5 text-[#64748B]">Dr. #{h.doctorId}</td>
                             <td className="px-5 py-3.5 text-[#64748B]">{formattedDate}</td>
                             <td className="px-5 py-3.5 text-[#0F172A] max-w-xs truncate" title={medsSummary}>
                               {medsSummary || "—"}
