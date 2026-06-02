@@ -68,9 +68,10 @@ public class QueueService {
             throw new BadRequestException("Queue entry is not in WAITING status");
         }
 
+        // Set to CALLED first — patient is being paged/called to the room
         queue.setStatus(QueueStatus.CALLED);
         queue.setCalledAt(LocalDateTime.now());
-        
+
         return mapToResponse(queueRepository.save(queue));
     }
 
@@ -80,19 +81,18 @@ public class QueueService {
                 .orElseThrow(() -> new ResourceNotFoundException("Queue entry not found with id: " + id));
 
         queue.setStatus(request.getStatus());
+
         if (request.getStatus() == QueueStatus.CALLED && queue.getCalledAt() == null) {
             queue.setCalledAt(LocalDateTime.now());
         }
 
         Appointment appointment = queue.getAppointment();
         if (request.getStatus() == QueueStatus.IN_ROOM) {
+            // Patient physically enters the room → appointment goes IN_PROGRESS
             appointment.setStatus(AppointmentStatus.IN_PROGRESS);
             appointmentRepository.save(appointment);
         } else if (request.getStatus() == QueueStatus.DONE) {
             appointment.setStatus(AppointmentStatus.COMPLETED);
-            appointmentRepository.save(appointment);
-        } else if (request.getStatus() == QueueStatus.NO_SHOW) {
-            appointment.setStatus(AppointmentStatus.NO_SHOW);
             appointmentRepository.save(appointment);
         }
 

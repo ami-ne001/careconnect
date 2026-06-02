@@ -87,10 +87,10 @@ export function QueueManagement() {
     await handleCall(nextWaiting.id);
   };
 
-  const serving = queue.find((q) => q.status === "CALLED");
+  const serving = queue.find((q) => q.status === "IN_ROOM");
+  const called = queue.filter((q) => q.status === "CALLED");
   const waiting = queue.filter((q) => q.status === "WAITING");
-  const served = queue.filter((q) => q.status === "COMPLETED").length;
-  const noShows = queue.filter((q) => q.status === "NO_SHOW").length;
+  const served = queue.filter((q) => q.status === "DONE").length;
 
   return (
     <div>
@@ -103,12 +103,12 @@ export function QueueManagement() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-5 mb-6">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
             {[
               { label: "Total Served Today", val: served, color: "text-[#10B981]" },
               { label: "Currently Waiting", val: waiting.length, color: "text-[#F59E0B]" },
-              { label: "No Shows Today", val: noShows, color: "text-[#EF4444]" },
-              { label: "Active Serving", val: serving ? "1" : "0", color: "text-[#0EA5E9]" },
+              { label: "Called / En Route", val: called.length, color: "text-[#8B5CF6]" },
+              { label: "Active in Room", val: serving ? "1" : "0", color: "text-[#0EA5E9]" },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-xl p-4 border border-[#E2E8F0] text-center" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
                 <p className="text-[10px] uppercase tracking-wider text-[#64748B] font-bold mb-1">{s.label}</p>
@@ -117,9 +117,36 @@ export function QueueManagement() {
             ))}
           </div>
 
+          {/* Called / En Route section */}
+          {called.length > 0 && (
+            <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-3">📢 Called — En Route to Room ({called.length})</p>
+              <div className="flex flex-wrap gap-3">
+                {called.map((q) => {
+                  const details = getAppointmentDetailsForQueue(q.appointmentId);
+                  return (
+                    <div key={q.id} className="flex items-center gap-3 bg-white border border-purple-200 rounded-lg px-4 py-2.5 shadow-sm">
+                      <span className="text-sm font-black text-purple-700">#{q.ticketNumber}</span>
+                      <div>
+                        <p className="text-xs font-semibold text-[#0F172A]">{details.patientName}</p>
+                        <p className="text-[10px] text-[#64748B]">Dr. {details.doctorName}</p>
+                      </div>
+                      <button
+                        onClick={() => handleStatusUpdate(q.id, "IN_ROOM")}
+                        className="ml-2 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold cursor-pointer hover:opacity-90"
+                      >
+                        Confirm in Room
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="bg-[#1E3A5F] rounded-xl p-6 text-white" style={{ boxShadow: "0 4px 16px rgba(30,58,95,0.3)" }}>
-              <p className="text-white/60 text-xs uppercase tracking-wider font-semibold mb-4">Now Calling / Serving</p>
+              <p className="text-white/60 text-xs uppercase tracking-wider font-semibold mb-4">Currently in Consultation Room</p>
               {serving ? (
                 <>
                   <div className="text-center mb-5">
@@ -148,22 +175,33 @@ export function QueueManagement() {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleStatusUpdate(serving.id, "COMPLETED")}
+                      onClick={() => handleStatusUpdate(serving.id, "DONE")}
                       className="flex-1 h-10 rounded-xl bg-[#10B981] text-white font-semibold text-xs hover:opacity-90 transition-all cursor-pointer"
                     >
                       Complete Visit
                     </button>
                     <button
-                      onClick={() => handleStatusUpdate(serving.id, "NO_SHOW")}
+                      onClick={async () => {
+                        try {
+                          const appt = allAppointments.find((a) => a.id === serving.appointmentId);
+                          if (appt) {
+                            await appointmentApi.updateAppointmentStatus(appt.id, "CANCELLED");
+                          }
+                          await handleStatusUpdate(serving.id, "DONE");
+                          toast.success("Patient ticket removed from queue.");
+                        } catch (err) {
+                          toast.error("Failed to cancel patient appointment.");
+                        }
+                      }}
                       className="flex-1 h-10 rounded-xl bg-red-600 text-white font-semibold text-xs hover:opacity-90 transition-all cursor-pointer"
                     >
-                      No Show
+                      No Show / Cancel
                     </button>
                   </div>
                 </>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-white/50 text-sm mb-4">No patients are currently being called.</p>
+                  <p className="text-white/50 text-sm mb-4">No patients are currently in the consultation rooms.</p>
                   <button
                     onClick={callNextInWaiting}
                     className="w-full h-11 rounded-xl bg-[#0EA5E9] text-white font-bold text-xs hover:opacity-90 transition-all cursor-pointer"
@@ -203,13 +241,24 @@ export function QueueManagement() {
                             onClick={() => handleCall(q.id)}
                             className="px-3 py-1.5 rounded-lg bg-[#0EA5E9] text-white text-xs font-semibold cursor-pointer hover:opacity-90"
                           >
-                            Call
+                            Call into Room
                           </button>
                           <button
-                            onClick={() => handleStatusUpdate(q.id, "NO_SHOW")}
+                            onClick={async () => {
+                              try {
+                                const appt = allAppointments.find((a) => a.id === q.appointmentId);
+                                if (appt) {
+                                  await appointmentApi.updateAppointmentStatus(appt.id, "CANCELLED");
+                                }
+                                await handleStatusUpdate(q.id, "DONE");
+                                toast.success("Patient ticket removed from queue.");
+                              } catch (err) {
+                                toast.error("Failed to cancel patient appointment.");
+                              }
+                            }}
                             className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-red-600 hover:bg-red-50 cursor-pointer"
                           >
-                            No Show
+                            Remove
                           </button>
                         </div>
                       </div>

@@ -98,7 +98,7 @@ public class DoctorAvailabilityService {
                 date.atStartOfDay(),
                 date.atTime(LocalTime.MAX)
         ).stream()
-         .filter(a -> a.getStatus() != AppointmentStatus.CANCELLED && a.getStatus() != AppointmentStatus.NO_SHOW)
+         .filter(a -> a.getStatus() != AppointmentStatus.CANCELLED)
          .collect(Collectors.toList());
 
         // 4. Generate slots and check for overlaps
