@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -306,5 +307,20 @@ public class SurgeryService {
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public long countScheduledSurgeriesThisMonth() {
+        LocalDate today = LocalDate.now();
+        LocalDate firstDay = today.withDayOfMonth(1);
+        LocalDate firstDayNextMonth = firstDay.plusMonths(1);
+
+        LocalDateTime start = firstDay.atStartOfDay();
+        LocalDateTime end = firstDayNextMonth.atStartOfDay();
+
+        List<Surgery> surgeries = surgeryRepository.findByScheduledAtBetween(start, end);
+        return surgeries.stream()
+                .filter(s -> s.getStatus() != SurgeryStatus.CANCELLED)
+                .count();
     }
 }

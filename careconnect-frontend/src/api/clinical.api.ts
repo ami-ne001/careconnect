@@ -1,5 +1,22 @@
 import { api } from "./axios";
 
+export interface AuditActivityResponse {
+  id: number;
+  userId: number | null;
+  userName: string;
+  role: string;
+  action: string;
+  module: string;
+  description: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+export interface DailyAuditActivityResponse {
+  day: string;
+  logins: number;
+}
+
 // ── Consultation ──────────────────────────────────────────────────
 export interface ConsultationResponse {
   id: number;
@@ -142,4 +159,14 @@ export const clinicalApi = {
   // Documents
   getDocumentsByPatient: (patientId: number) =>
     api.get<MedicalDocumentResponse[]>(`/api/documents/patient/${patientId}`),
+
+  // Audit logs
+  getRecentActivity: () =>
+    api.get<AuditActivityResponse[]>("/api/clinical/audit-logs/recent"),
+
+  getDailyAuditActivity: () =>
+    api.get<DailyAuditActivityResponse[]>("/api/clinical/audit-logs/daily"),
+
+  getScheduledSurgeriesThisMonth: () =>
+    api.get<number>("/api/clinical/surgeries/metrics/scheduled-this-month"),
 };
