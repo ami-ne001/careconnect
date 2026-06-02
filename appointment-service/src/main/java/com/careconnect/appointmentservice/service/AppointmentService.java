@@ -197,7 +197,7 @@ public class AppointmentService {
             if (appointmentId != null && appt.getId().equals(appointmentId)) {
                 continue;
             }
-            if (appt.getStatus() == AppointmentStatus.CANCELLED || appt.getStatus() == AppointmentStatus.NO_SHOW) {
+            if (appt.getStatus() == AppointmentStatus.CANCELLED) {
                 continue;
             }
 

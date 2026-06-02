@@ -93,7 +93,7 @@ export function ReceptionistDashboard() {
   const getTodayDateString = () => new Date().toISOString().split("T")[0];
   const todayAppts = appointments.filter(a => a.scheduledAt.startsWith(getTodayDateString()));
   const checkedInAppts = todayAppts.filter(a => ["CHECKED_IN", "IN_PROGRESS", "COMPLETED"].includes(a.status));
-  const waitingQueue = queue.filter(q => q.status === "WAITING" || q.status === "CALLED");
+  const waitingQueue = queue.filter(q => q.status === "WAITING" || q.status === "CALLED" || q.status === "IN_ROOM");
 
   // Format today's schedule list
   const sortedTodayAppts = [...todayAppts].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
@@ -151,8 +151,14 @@ export function ReceptionistDashboard() {
               ) : (
                 <div className="divide-y divide-[#F1F5F9]">
                   {queue.map((q) => (
-                    <div key={q.id} className={`flex items-center gap-4 px-5 py-3.5 ${q.status === "CALLED" ? "bg-blue-50" : ""}`}>
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${q.status === "CALLED" ? "bg-[#0EA5E9] text-white" : "bg-[#F0F4F8] text-[#64748B]"}`}>
+                    <div key={q.id} className={`flex items-center gap-4 px-5 py-3.5 ${
+                      q.status === "IN_ROOM" ? "bg-blue-50" : q.status === "CALLED" ? "bg-purple-50" : ""
+                    }`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                        q.status === "IN_ROOM" ? "bg-[#0EA5E9] text-white" :
+                        q.status === "CALLED" ? "bg-purple-500 text-white" :
+                        "bg-[#F0F4F8] text-[#64748B]"
+                      }`}>
                         #{q.ticketNumber}
                       </div>
                       <div className="flex-1">
@@ -167,14 +173,20 @@ export function ReceptionistDashboard() {
                         })()}
                       </div>
                       <span className="text-xs text-[#64748B]">Checked In: {new Date(q.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <Badge variant={q.status === "CALLED" ? "active" : "pending"} dot>{q.status}</Badge>
-                      {q.status === "CALLED" ? (
-                        <button
-                          onClick={() => handleCheckIn(q.id, q.appointmentId)}
-                          className="px-3 py-1.5 rounded-lg bg-[#10B981] text-white text-xs font-semibold cursor-pointer"
-                        >
-                          Check In
-                        </button>
+                      <Badge
+                        variant={q.status === "IN_ROOM" ? "active" : q.status === "CALLED" ? "warning" : "pending"}
+                        dot
+                      >
+                        {q.status === "CALLED" ? "Called" : q.status === "IN_ROOM" ? "In Room" : q.status}
+                      </Badge>
+                      {q.status === "IN_ROOM" ? (
+                        <span className="text-xs font-semibold text-[#0EA5E9] bg-sky-50 px-2.5 py-1.5 rounded-lg border border-sky-100">
+                          In Room
+                        </span>
+                      ) : q.status === "CALLED" ? (
+                        <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100">
+                          En Route
+                        </span>
                       ) : q.status === "WAITING" ? (
                         <button
                           onClick={() => handleCall(q.id)}
