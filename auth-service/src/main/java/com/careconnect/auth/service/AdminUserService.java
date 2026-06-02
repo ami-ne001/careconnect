@@ -6,6 +6,8 @@ import com.careconnect.auth.dto.UserUpdateRequest;
 import com.careconnect.auth.entity.Department;
 import com.careconnect.auth.entity.User;
 import com.careconnect.auth.enums.Role;
+import com.careconnect.auth.messaging.EventPublisher;
+import com.careconnect.auth.messaging.DoctorUserCreatedEvent;
 import com.careconnect.auth.repository.DepartmentRepository;
 import com.careconnect.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EventPublisher eventPublisher;
 
     public UserResponse createUser(UserCreateRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -51,6 +54,11 @@ public class AdminUserService {
                 .build();
 
         User saved = userRepository.save(user);
+        if (saved.getRole() == Role.DOCTOR) {
+            eventPublisher.publishDoctorUserCreated(DoctorUserCreatedEvent.builder()
+                    .userId(saved.getId())
+                    .build());
+        }
         return mapToResponse(saved);
     }
 

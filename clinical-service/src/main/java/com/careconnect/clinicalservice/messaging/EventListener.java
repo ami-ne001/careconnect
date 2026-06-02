@@ -2,11 +2,13 @@ package com.careconnect.clinicalservice.messaging;
 
 import com.careconnect.clinicalservice.entity.AuditLog;
 import com.careconnect.clinicalservice.entity.CareTask;
+import com.careconnect.clinicalservice.entity.DoctorProfile;
 import com.careconnect.clinicalservice.enums.AuditAction;
 import com.careconnect.clinicalservice.enums.TaskPriority;
 import com.careconnect.clinicalservice.enums.TaskStatus;
 import com.careconnect.clinicalservice.repository.AuditLogRepository;
 import com.careconnect.clinicalservice.repository.CareTaskRepository;
+import com.careconnect.clinicalservice.repository.DoctorProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -21,6 +23,7 @@ public class EventListener {
 
     private final CareTaskRepository careTaskRepository;
     private final AuditLogRepository auditLogRepository;
+    private final DoctorProfileRepository doctorProfileRepository;
 
     @RabbitListener(queues = RabbitMQConfig.PATIENT_ADMITTED_QUEUE)
     public void handlePatientAdmitted(PatientAdmittedEvent event) {
@@ -75,6 +78,35 @@ public class EventListener {
             log.info("Successfully logged audit trail for uploaded lab result ID: {}", event.getLabResultId());
         } catch (Exception e) {
             log.error("Error processing LabResultUploadedEvent: ", e);
+        }
+    }
+
+    @RabbitListener(queues = RabbitMQConfig.DOCTOR_USER_CREATED_QUEUE)
+    public void handleDoctorUserCreated(DoctorUserCreatedEvent event) {
+        log.info("Received DoctorUserCreatedEvent: {}", event);
+        try {
+            if (event == null || event.getUserId() == null) {
+                log.warn("DoctorUserCreatedEvent missing userId; skipping");
+                return;
+            }
+
+            boolean alreadyExists = doctorProfileRepository.findByUserId(event.getUserId()).isPresent();
+            if (alreadyExists) {
+                log.info("Doctor profile already exists for userId={}, skipping create", event.getUserId());
+                return;
+            }
+
+            DoctorProfile profile = DoctorProfile.builder()
+                    .userId(event.getUserId())
+                    .isSurgeon(false)
+                    .specialty("General Practice")
+                    .yearsExperience(0)
+                    .bio("")
+                    .build();
+            doctorProfileRepository.save(profile);
+            log.info("Created doctor profile for userId={}", event.getUserId());
+        } catch (Exception e) {
+            log.error("Error processing DoctorUserCreatedEvent: ", e);
         }
     }
 }

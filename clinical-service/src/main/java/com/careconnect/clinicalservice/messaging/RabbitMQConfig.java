@@ -12,9 +12,11 @@ public class RabbitMQConfig {
     
     public static final String PATIENT_ADMITTED_QUEUE = "clinical-patient-admitted-queue";
     public static final String LAB_RESULT_UPLOADED_QUEUE = "clinical-lab-result-uploaded-queue";
+    public static final String DOCTOR_USER_CREATED_QUEUE = "clinical-doctor-user-created-queue";
     
     public static final String ROUTING_KEY_PATIENT_ADMITTED = "patient.admitted";
     public static final String ROUTING_KEY_LAB_RESULT_UPLOADED = "lab.result.uploaded";
+    public static final String ROUTING_KEY_DOCTOR_USER_CREATED = "doctor.user.created";
     public static final String ROUTING_KEY_CONSULTATION_CLOSED = "consultation.closed";
     public static final String ROUTING_KEY_SURGERY_SCHEDULED = "surgery.scheduled";
 
@@ -34,6 +36,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue doctorUserCreatedQueue() {
+        return new Queue(DOCTOR_USER_CREATED_QUEUE, true);
+    }
+
+    @Bean
     public Binding bindingPatientAdmitted(Queue patientAdmittedQueue, TopicExchange careConnectExchange) {
         return BindingBuilder.bind(patientAdmittedQueue).to(careConnectExchange).with(ROUTING_KEY_PATIENT_ADMITTED);
     }
@@ -41,6 +48,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding bindingLabResultUploaded(Queue labResultUploadedQueue, TopicExchange careConnectExchange) {
         return BindingBuilder.bind(labResultUploadedQueue).to(careConnectExchange).with(ROUTING_KEY_LAB_RESULT_UPLOADED);
+    }
+
+    @Bean
+    public Binding bindingDoctorUserCreated(Queue doctorUserCreatedQueue, TopicExchange careConnectExchange) {
+        return BindingBuilder.bind(doctorUserCreatedQueue).to(careConnectExchange).with(ROUTING_KEY_DOCTOR_USER_CREATED);
     }
 
     @Bean

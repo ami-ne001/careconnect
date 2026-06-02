@@ -64,4 +64,10 @@ public class SurgeryController {
     public ResponseEntity<List<SurgeryResponse>> getSurgeriesBySurgeon(@PathVariable Long surgeonId) {
         return ResponseEntity.ok(surgeryService.getSurgeriesByLeadSurgeon(surgeonId));
     }
+
+    @GetMapping("/metrics/scheduled-this-month")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Long> getScheduledSurgeriesThisMonth() {
+        return ResponseEntity.ok(surgeryService.countScheduledSurgeriesThisMonth());
+    }
 }

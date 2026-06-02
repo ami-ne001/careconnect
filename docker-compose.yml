@@ -139,6 +139,20 @@ services:
     networks:
       - careconnect-network
 
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: careconnect-phpmyadmin
+    ports:
+      - "8090:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: root
+    depends_on:
+      - mysql
+    networks:
+      - careconnect-network
+
 networks:
   careconnect-network:
     driver: bridge
