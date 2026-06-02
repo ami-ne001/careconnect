@@ -61,5 +61,8 @@ export const labApi = {
   // Results
   getResultByLabRequestId: (labRequestId: number) =>
     api.get<LabResultResponse>(`/api/lab/results/request/${labRequestId}`),
+
+  updateLabRequestStatus: (labRequestId: number, status: string) =>
+    api.patch<LabRequestResponse>(`/api/lab/requests/${labRequestId}/status`, { status }),
 };
 

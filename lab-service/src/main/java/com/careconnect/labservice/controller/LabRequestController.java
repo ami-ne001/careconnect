@@ -50,7 +50,7 @@ public class LabRequestController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('LAB_TECHNICIAN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('LAB_TECHNICIAN', 'ADMIN', 'DOCTOR')")
     public ResponseEntity<LabRequestResponse> updateStatus(@PathVariable Long id, @Valid @RequestBody LabRequestStatusUpdateRequest request) {
         return ResponseEntity.ok(labRequestService.updateStatus(id, request.getStatus()));
     }
