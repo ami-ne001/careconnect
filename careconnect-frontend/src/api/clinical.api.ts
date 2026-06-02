@@ -17,6 +17,22 @@ export interface DailyAuditActivityResponse {
   logins: number;
 }
 
+export interface AuditLogQueryParams {
+  q?: string;
+  action?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface AuditLogPageResponse {
+  items: AuditActivityResponse[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 // ── Consultation ──────────────────────────────────────────────────
 export interface ConsultationResponse {
   id: number;
@@ -166,6 +182,9 @@ export const clinicalApi = {
 
   getDailyAuditActivity: () =>
     api.get<DailyAuditActivityResponse[]>("/api/clinical/audit-logs/daily"),
+
+  getAuditLogs: (params?: AuditLogQueryParams) =>
+    api.get<AuditLogPageResponse>("/api/clinical/audit-logs", { params }),
 
   getScheduledSurgeriesThisMonth: () =>
     api.get<number>("/api/clinical/surgeries/metrics/scheduled-this-month"),
