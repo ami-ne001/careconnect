@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Stethoscope, FlaskConical, Pill, CheckCircle, RefreshCw, Plus, X, ChevronDown } from "lucide-react";
+import { Stethoscope, FlaskConical, Pill, CheckCircle, RefreshCw, Plus, X, ChevronDown, TestTube, AlertTriangle } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { appointmentApi, receptionistApi } from "@/api";
 import { clinicalApi } from "@/api/clinical.api";
+import { labApi } from "@/api/lab.api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -13,6 +14,7 @@ import type {
   VitalsCreateRequest,
   PrescriptionItemDto,
 } from "@/api/clinical.api";
+import type { LabTestTypeResponse, LabRequestResponse } from "@/api/lab.api";
 
 const SYMPTOM_CHIPS = [
   "Headache", "Fatigue", "Chest Pain", "Shortness of Breath",
@@ -58,6 +60,55 @@ export function DoctorConsultations() {
   ]);
   const [rxNotes, setRxNotes] = useState("");
   const [savingRx, setSavingRx] = useState(false);
+
+  // ── Lab Tests ─────────────────────────────────────────────────
+  const [showLab, setShowLab] = useState(false);
+  const [testTypes, setTestTypes] = useState<LabTestTypeResponse[]>([]);
+  const [labRequests, setLabRequests] = useState<LabRequestResponse[]>([]);
+  const [selectedTestTypeId, setSelectedTestTypeId] = useState<number | "">("");
+  const [labPriority, setLabPriority] = useState<"NORMAL" | "URGENT" | "CRITICAL">("NORMAL");
+  const [submittingLab, setSubmittingLab] = useState(false);
+
+  // ── Load lab test types once ──────────────────────────────────
+  useEffect(() => {
+    labApi.getAllTestTypes()
+      .then(({ data }) => setTestTypes(data || []))
+      .catch(() => { /* silent */ });
+  }, []);
+
+  // ── Load existing lab requests for a consultation ─────────────
+  const loadLabRequests = (consultationId: number) => {
+    labApi.getLabRequestsByConsultation(consultationId)
+      .then(({ data }) => setLabRequests(data || []))
+      .catch(() => { /* silent */ });
+  };
+
+  // ── Submit a single lab request ───────────────────────────────
+  const submitLabRequest = async () => {
+    if (!consultation || !activeAppt || !userId) return;
+    if (!selectedTestTypeId) {
+      toast.error("Please select a test type.");
+      return;
+    }
+    setSubmittingLab(true);
+    try {
+      const { data } = await labApi.createLabRequest({
+        consultationId: consultation.id,
+        patientId: activeAppt.patientId,
+        doctorId: userId,
+        testTypeId: Number(selectedTestTypeId),
+        priority: labPriority,
+      });
+      setLabRequests((prev) => [...prev, data]);
+      setSelectedTestTypeId("");
+      setLabPriority("NORMAL");
+      toast.success("Lab test requested successfully.");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to submit lab request."));
+    } finally {
+      setSubmittingLab(false);
+    }
+  };
 
   // ── Load today's queue ────────────────────────────────────────
   const loadQueue = () => {
@@ -133,6 +184,7 @@ export function DoctorConsultations() {
         setSymptoms(existingConsult.symptoms ? existingConsult.symptoms.split(", ") : []);
         setDiagnosis(existingConsult.diagnosis || "");
         setClinicalNotes(existingConsult.clinicalNotes || "");
+        loadLabRequests(existingConsult.id);
         toast.success("Loaded active consultation.");
       } else {
         // 2. Update appointment to IN_PROGRESS
@@ -145,6 +197,7 @@ export function DoctorConsultations() {
           doctorId: userId,
         });
         setConsultation(data);
+        loadLabRequests(data.id);
         toast.success("Consultation started successfully.");
       }
       loadQueue();
@@ -257,6 +310,9 @@ export function DoctorConsultations() {
       setVitals({ bpSystolic: "", bpDiastolic: "", heartRate: "", temperature: "", oxygenSat: "", weightKg: "" });
       setRxItems([{ medication: "", dosage: "", frequency: "", durationDays: 7, quantity: 1, instructions: "" }]);
       setRxNotes("");
+      setLabRequests([]);
+      setSelectedTestTypeId("");
+      setLabPriority("NORMAL");
       loadQueue();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to complete consultation."));
@@ -562,6 +618,122 @@ export function DoctorConsultations() {
                     ))}
                   </div>
                   <p className="text-xs text-[#94A3B8] italic">Vitals will be saved automatically when you complete the consultation.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Lab Tests Panel */}
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
+              <button
+                onClick={() => setShowLab(!showLab)}
+                className="w-full flex items-center justify-between px-5 py-3.5 bg-[#F8FAFC] text-sm font-bold text-[#0F172A] cursor-pointer hover:bg-[#F1F5F9] transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <TestTube size={16} className="text-[#8B5CF6]" />
+                  Request Lab Tests
+                  {labRequests.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#8B5CF6] text-white text-[10px] font-bold">
+                      {labRequests.length}
+                    </span>
+                  )}
+                </span>
+                <ChevronDown size={16} className={`transition-transform ${showLab ? "rotate-180" : ""}`} />
+              </button>
+              {showLab && (
+                <div className="p-5 bg-white border-t border-[#E2E8F0] space-y-4">
+                  {/* New request form */}
+                  <div className="bg-[#FAFCFF] border border-[#E2E8F0] rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-bold text-[#1E3A5F] uppercase tracking-wider">Add Lab Test</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <select
+                        value={selectedTestTypeId}
+                        onChange={(e) => setSelectedTestTypeId(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="col-span-2 h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] bg-white"
+                      >
+                        <option value="">Select test type…</option>
+                        {testTypes.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}{t.category ? ` — ${t.category}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="col-span-2">
+                        <p className="text-xs font-semibold text-[#64748B] mb-1.5">Priority</p>
+                        <div className="flex gap-2">
+                          {(["NORMAL", "URGENT", "CRITICAL"] as const).map((p) => (
+                            <button
+                              key={p}
+                              onClick={() => setLabPriority(p)}
+                              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                                labPriority === p
+                                  ? p === "CRITICAL"
+                                    ? "bg-red-600 text-white border-red-600"
+                                    : p === "URGENT"
+                                    ? "bg-orange-500 text-white border-orange-500"
+                                    : "bg-[#8B5CF6] text-white border-[#8B5CF6]"
+                                  : "bg-white text-[#64748B] border-[#E2E8F0] hover:border-[#8B5CF6]"
+                              }`}
+                            >
+                              {p === "CRITICAL" && <AlertTriangle size={11} className="inline mr-1" />}
+                              {p}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={submitLabRequest}
+                      disabled={submittingLab || !selectedTestTypeId}
+                      className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-[#8B5CF6] text-white text-xs font-bold hover:opacity-90 disabled:opacity-50 cursor-pointer transition-opacity"
+                    >
+                      {submittingLab ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={13} />}
+                      Send to Lab
+                    </button>
+                  </div>
+
+                  {/* Existing requests list */}
+                  {labRequests.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Requested This Session</p>
+                      {labRequests.map((req) => {
+                        const testType = testTypes.find((t) => t.id === req.testTypeId);
+                        const priorityColor =
+                          req.priority === "CRITICAL" ? "text-red-600 bg-red-50 border-red-200" :
+                          req.priority === "URGENT" ? "text-orange-600 bg-orange-50 border-orange-200" :
+                          "text-[#8B5CF6] bg-purple-50 border-purple-200";
+                        const statusColor =
+                          req.status === "COMPLETED" ? "text-[#10B981]" :
+                          req.status === "CANCELLED" ? "text-red-500" :
+                          req.status === "PROCESSING" ? "text-[#F59E0B]" :
+                          "text-[#64748B]";
+                        return (
+                          <div
+                            key={req.id}
+                            className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#E2E8F0] bg-[#FAFCFF]"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                              <TestTube size={15} className="text-[#8B5CF6]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-[#0F172A] truncate">
+                                {req.testTypeName || testType?.name || `Test #${req.testTypeId}`}
+                              </p>
+                              <p className={`text-[10px] font-medium mt-0.5 ${statusColor}`}>
+                                {req.status.replace(/_/g, " ")}
+                              </p>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${priorityColor}`}>
+                              {req.priority}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-[#94A3B8] italic font-medium">
+                    Lab requests are sent immediately to the lab department.
+                  </p>
                 </div>
               )}
             </div>
