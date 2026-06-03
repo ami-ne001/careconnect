@@ -201,7 +201,7 @@ export function PatientLabResults() {
                         )}
                         <div className="px-5 py-4 bg-[#F8FAFC] border-t border-[#E2E8F0]">
                           <p className="text-[10px] text-[#64748B] text-center">
-                            Results processed on {new Date(req.result.testedAt).toLocaleDateString()} · Certified by CareConnect Laboratory Service
+                            Results processed on {new Date(req.result.uploadedAt).toLocaleDateString()} · Certified by CareConnect Laboratory Service
                           </p>
                         </div>
                       </>

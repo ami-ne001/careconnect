@@ -131,15 +131,11 @@ export function LabTestCatalog() {
                                 <tbody>
                                   {referenceRanges[test.id].map(range => (
                                     <tr key={range.id} className="border-b border-[#F1F5F9] last:border-0">
-                                      <td className="py-2 text-[#0F172A]">{range.componentName}</td>
-                                      <td className="py-2 text-[#64748B]">{range.targetGender || "All"}</td>
-                                      <td className="py-2 text-[#64748B]">
-                                        {(range.minAge !== undefined || range.maxAge !== undefined) 
-                                          ? `${range.minAge || 0} - ${range.maxAge || '+'}`
-                                          : "All"}
-                                      </td>
+                                      <td className="py-2 text-[#0F172A]">{range.component}</td>
+                                      <td className="py-2 text-[#64748B]">{range.gender || "All"}</td>
+                                      <td className="py-2 text-[#64748B]">All</td>
                                       <td className="py-2 font-medium text-[#10B981]">
-                                        {range.minNormal} - {range.maxNormal}
+                                        {range.minValue} - {range.maxValue}
                                       </td>
                                       <td className="py-2 text-[#64748B]">{range.unit}</td>
                                     </tr>

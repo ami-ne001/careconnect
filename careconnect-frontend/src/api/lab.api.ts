@@ -34,9 +34,10 @@ export interface LabRequestCreateRequest {
 export interface LabResultResponse {
   id: number;
   labRequestId: number;
-  testedAt: string;
+  technicianId: number;
   resultData: string;
   interpretation?: string;
+  uploadedAt: string;
 }
 
 export interface LabResultCreateRequest {
@@ -47,25 +48,24 @@ export interface LabResultCreateRequest {
 }
 
 export interface ReferenceRangeCreateRequest {
-  componentName: string;
-  minNormal: number;
-  maxNormal: number;
+  testTypeId: number;
+  component: string;
   unit: string;
-  targetGender?: string;
-  minAge?: number;
-  maxAge?: number;
+  minValue: number;
+  maxValue: number;
+  gender?: string;
+  notes?: string;
 }
 
 export interface ReferenceRangeResponse {
   id: number;
   testTypeId: number;
-  componentName: string;
-  minNormal: number;
-  maxNormal: number;
+  component: string;
   unit: string;
-  targetGender?: string;
-  minAge?: number;
-  maxAge?: number;
+  minValue: number;
+  maxValue: number;
+  gender?: string;
+  notes?: string;
 }
 
 export interface EquipmentResponse {
