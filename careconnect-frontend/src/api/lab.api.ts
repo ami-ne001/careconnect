@@ -39,11 +39,88 @@ export interface LabResultResponse {
   interpretation?: string;
 }
 
+export interface ReferenceRangeCreateRequest {
+  componentName: string;
+  minNormal: number;
+  maxNormal: number;
+  unit: string;
+  targetGender?: string;
+  minAge?: number;
+  maxAge?: number;
+}
+
+export interface ReferenceRangeResponse {
+  id: number;
+  testTypeId: number;
+  componentName: string;
+  minNormal: number;
+  maxNormal: number;
+  unit: string;
+  targetGender?: string;
+  minAge?: number;
+  maxAge?: number;
+}
+
+export interface EquipmentResponse {
+  id: number;
+  name: string;
+  type: string;
+  status: "ACTIVE" | "MAINTENANCE" | "BROKEN" | "RETIRED";
+  lastCalibrationDate?: string;
+  nextCalibrationDate?: string;
+  notes?: string;
+}
+
+export interface MaintenanceResponse {
+  id: number;
+  equipmentId: number;
+  issueDescription: string;
+  reportedBy: number;
+  reportedAt: string;
+  resolvedAt?: string;
+  resolutionNotes?: string;
+  status: "PENDING" | "IN_PROGRESS" | "RESOLVED";
+}
+
+export interface MaintenanceCreateRequest {
+  issueDescription: string;
+}
+
+export interface LabTestTypeCreateRequest {
+  name: string;
+  category?: string;
+  sampleType?: string;
+  description?: string;
+}
+
 // ── API ───────────────────────────────────────────────────────────
 export const labApi = {
   // Test Types
   getAllTestTypes: () =>
     api.get<LabTestTypeResponse[]>("/api/lab/test-types"),
+  
+  createTestType: (body: LabTestTypeCreateRequest) =>
+    api.post<LabTestTypeResponse>("/api/lab/test-types", body),
+
+  getReferenceRanges: (testTypeId: number) =>
+    api.get<ReferenceRangeResponse[]>(`/api/lab/test-types/${testTypeId}/reference-ranges`),
+    
+  addReferenceRange: (testTypeId: number, body: ReferenceRangeCreateRequest) =>
+    api.post<ReferenceRangeResponse>(`/api/lab/test-types/${testTypeId}/reference-ranges`, body),
+
+  // Equipment
+  getAllEquipment: () =>
+    api.get<EquipmentResponse[]>("/api/lab/equipment"),
+
+  updateEquipmentStatus: (id: number, status: string) =>
+    api.patch<EquipmentResponse>(`/api/lab/equipment/${id}/status`, { status }),
+
+  // Maintenance
+  getMaintenanceHistory: (equipmentId: number) =>
+    api.get<MaintenanceResponse[]>(`/api/lab/equipment/${equipmentId}/maintenance`),
+
+  reportMaintenance: (equipmentId: number, body: MaintenanceCreateRequest) =>
+    api.post<MaintenanceResponse>(`/api/lab/equipment/${equipmentId}/maintenance`, body),
 
   // Lab Requests
   createLabRequest: (body: LabRequestCreateRequest) =>
