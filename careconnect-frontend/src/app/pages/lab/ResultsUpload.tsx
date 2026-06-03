@@ -1,41 +1,103 @@
-import { useState } from "react";
-import { Upload, Flag, CheckCircle, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, CheckCircle, Search, AlertCircle } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { Badge } from "../../components/ui/Badge";
-
-const inProgressTests = [
-  { id: "LAB-4422", label: "LAB-4422 — Ahmed Al-Farsi — CBC" },
-  { id: "LAB-4423", label: "LAB-4423 — Maria Santos — Lipid Panel" },
-  { id: "LAB-4425", label: "LAB-4425 — Carlos Rivera — Liver Function Tests" },
-  { id: "LAB-4430", label: "LAB-4430 — Diana Collins — Vitamin D Level" },
-];
-
-const cbcFields = [
-  { name: "WBC (White Blood Cells)", unit: "10³/µL", normal: "4.5–11.0" },
-  { name: "RBC (Red Blood Cells)", unit: "10⁶/µL", normal: "4.5–5.9" },
-  { name: "Hemoglobin", unit: "g/dL", normal: "13.5–17.5" },
-  { name: "Hematocrit", unit: "%", normal: "41–53" },
-  { name: "Platelets", unit: "10³/µL", normal: "150–400" },
-  { name: "MCV", unit: "fL", normal: "80–100" },
-];
-
-const recentUploads = [
-  { patient: "John Whitaker", test: "Thyroid Panel", time: "11:45 AM", flagged: false },
-  { patient: "Priya Sharma", test: "Urinalysis", time: "11:20 AM", flagged: false },
-  { patient: "Robert James", test: "HbA1c", time: "10:55 AM", flagged: true },
-  { patient: "Fatima Al-Sayed", test: "Coagulation Panel", time: "10:30 AM", flagged: true },
-  { patient: "Kevin Yip", test: "Urine Culture", time: "10:10 AM", flagged: false },
-];
+import { labApi, LabRequestResponse } from "../../../api/lab.api";
+import { receptionistApi } from "../../../api/receptionist.api";
+import { useAuth } from "../../../store/useAuth";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 export function LabResultsUpload() {
-  const [selectedTest, setSelectedTest] = useState("");
-  const [flagCritical, setFlagCritical] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const { userId } = useAuth();
+  const [requests, setRequests] = useState<LabRequestResponse[]>([]);
+  const [patients, setPatients] = useState<Record<number, string>>({});
+  const [loading, setLoading] = useState(true);
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 2000);
+  const [selectedTestId, setSelectedTestId] = useState<number | "">("");
+  const [resultData, setResultData] = useState("");
+  const [interpretation, setInterpretation] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [recentlyUploaded, setRecentlyUploaded] = useState<LabRequestResponse[]>([]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [reqsRes, patientsRes] = await Promise.all([
+        labApi.getAllLabRequests(),
+        receptionistApi.getPatientsList(0, 1000)
+      ]);
+      
+      setRequests(reqsRes.data);
+      
+      const pMap: Record<number, string> = {};
+      (patientsRes.data.content || []).forEach(p => {
+        if (p.userId) {
+          pMap[p.userId] = `${p.firstName} ${p.lastName}`.trim();
+        }
+      });
+      setPatients(pMap);
+
+      // Pre-fill recently uploaded based on COMPLETED status today
+      const today = new Date().toDateString();
+      const completed = reqsRes.data.filter(r => r.status === "COMPLETED" && new Date(r.requestedAt).toDateString() === today);
+      setRecentlyUploaded(completed.slice(0, 5));
+
+    } catch (error) {
+      console.error("Failed to load requests for upload", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const getPatientName = (patientId: number) => {
+    return patients[patientId] || `Patient #${patientId}`;
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedTestId || !userId) {
+      toast.error("Select a test to upload results for.");
+      return;
+    }
+    if (!resultData.trim()) {
+      toast.error("Result values are required.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await labApi.uploadResult({
+        labRequestId: Number(selectedTestId),
+        technicianId: userId,
+        resultData,
+        interpretation
+      });
+      
+      toast.success("Results uploaded successfully and doctor notified.");
+      
+      // Update UI state
+      setResultData("");
+      setInterpretation("");
+      const completedReq = requests.find(r => r.id === Number(selectedTestId));
+      if (completedReq) {
+        setRecentlyUploaded([completedReq, ...recentlyUploaded]);
+      }
+      setSelectedTestId("");
+      
+      // Reload queue
+      loadData();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to upload result"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const processingTests = requests.filter(r => r.status === "PROCESSING");
+  const selectedTest = requests.find(r => r.id === Number(selectedTestId));
 
   return (
     <div>
@@ -45,142 +107,110 @@ export function LabResultsUpload() {
         {/* Upload Form */}
         <div className="xl:col-span-2 space-y-5">
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-6" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h3 className="font-semibold text-[#0F172A] mb-5">Enter Test Results</h3>
+            <h3 className="font-semibold text-[#0F172A] mb-5 flex items-center gap-2">
+              <Upload size={18} className="text-[#0EA5E9]"/> Enter Test Results
+            </h3>
 
             {/* Test Selector */}
             <div className="mb-5">
               <label className="block text-xs font-medium text-[#64748B] mb-1.5">Select In-Progress Test</label>
-              <select
-                value={selectedTest}
-                onChange={(e) => setSelectedTest(e.target.value)}
-                className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] bg-white"
-              >
-                <option value="">— Select a test —</option>
-                {inProgressTests.map((t) => (
-                  <option key={t.id} value={t.id}>{t.label}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                <select
+                  value={selectedTestId}
+                  onChange={(e) => setSelectedTestId(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="w-full h-11 pl-9 pr-4 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] bg-white appearance-none cursor-pointer"
+                >
+                  <option value="">— Select a test in PROCESSING status —</option>
+                  {processingTests.map((t) => (
+                    <option key={t.id} value={t.id}>LAB-{t.id} — {getPatientName(t.patientId)} — {t.testTypeName}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Patient Info (auto-fill) */}
             {selectedTest && (
-              <div className="mb-5 p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] grid grid-cols-3 gap-3 text-sm">
+              <div className="mb-5 p-4 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] grid grid-cols-1 md:grid-cols-3 gap-4 text-sm animate-fadeIn">
                 <div>
-                  <p className="text-xs text-[#64748B]">Patient</p>
-                  <p className="font-medium text-[#0F172A]">Ahmed Al-Farsi</p>
+                  <p className="text-xs text-[#64748B] uppercase tracking-wider font-semibold mb-1">Patient</p>
+                  <p className="font-medium text-[#0F172A]">{getPatientName(selectedTest.patientId)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-[#64748B]">Test Type</p>
-                  <p className="font-medium text-[#0F172A]">Complete Blood Count</p>
+                  <p className="text-xs text-[#64748B] uppercase tracking-wider font-semibold mb-1">Test Type</p>
+                  <p className="font-medium text-[#0F172A]">{selectedTest.testTypeName}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-[#64748B]">Ordering Doctor</p>
-                  <p className="font-medium text-[#0F172A]">Dr. Sarah Mitchell</p>
+                  <p className="text-xs text-[#64748B] uppercase tracking-wider font-semibold mb-1">Priority</p>
+                  <p className={`font-bold ${selectedTest.priority === "URGENT" || selectedTest.priority === "CRITICAL" ? "text-red-500" : "text-[#0EA5E9]"}`}>
+                    {selectedTest.priority}
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* CBC Fields */}
+            {/* Result Data Text Area */}
             <div className="mb-5">
-              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-3">Result Values</p>
-              <div className="space-y-3">
-                {cbcFields.map((field) => (
-                  <div key={field.name} className="grid grid-cols-3 gap-3 items-center">
-                    <label className="text-sm text-[#0F172A]">{field.name}</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        placeholder="Value"
-                        className="flex-1 h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9]"
-                      />
-                      <span className="text-xs text-[#64748B] shrink-0">{field.unit}</span>
-                    </div>
-                    <span className="text-xs text-[#64748B]">Normal: {field.normal}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="mb-5">
-              <label className="block text-xs font-medium text-[#64748B] mb-1.5">Notes / Interpretation</label>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-2">Result Values / Data</label>
               <textarea
-                rows={3}
-                placeholder="Add notes or clinical interpretation..."
-                className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] resize-none"
+                value={resultData}
+                onChange={(e) => setResultData(e.target.value)}
+                rows={6}
+                placeholder="Enter result values, findings, or paste structured data here..."
+                className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9]"
+                disabled={!selectedTestId}
               />
             </div>
 
-            {/* Flag Critical */}
+            {/* Interpretation */}
             <div className="mb-6">
-              <button
-                onClick={() => setFlagCritical(!flagCritical)}
-                className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-colors ${
-                  flagCritical
-                    ? "border-[#EF4444] bg-[#FEF2F2]"
-                    : "border-[#E2E8F0] bg-[#F8FAFC] hover:border-[#EF4444]/50"
-                }`}
-              >
-                <Flag size={18} className={flagCritical ? "text-[#EF4444]" : "text-[#94A3B8]"} />
-                <div className="text-left">
-                  <p className={`text-sm font-semibold ${flagCritical ? "text-[#EF4444]" : "text-[#64748B]"}`}>
-                    Flag as Critical
-                  </p>
-                  <p className="text-xs text-[#94A3B8]">Doctor will be notified immediately</p>
-                </div>
-                <div className="ml-auto">
-                  <div className={`w-10 h-5 rounded-full transition-colors ${flagCritical ? "bg-[#EF4444]" : "bg-[#E2E8F0]"}`}>
-                    <div className={`w-4 h-4 rounded-full bg-white mt-0.5 transition-all ${flagCritical ? "ml-5.5" : "ml-0.5"}`} />
-                  </div>
-                </div>
-              </button>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-2">Clinical Interpretation / Notes</label>
+              <textarea
+                value={interpretation}
+                onChange={(e) => setInterpretation(e.target.value)}
+                rows={3}
+                placeholder="Add technician notes, anomalies, or interpretation..."
+                className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] resize-none"
+                disabled={!selectedTestId}
+              />
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleSubmit}
-                className={`flex-1 h-11 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-colors ${
-                  submitted ? "bg-[#10B981] text-white" : "bg-[#1E3A5F] text-white hover:bg-[#162d4a]"
-                }`}
-              >
-                {submitted ? (
-                  <><CheckCircle size={15} />Uploaded & Notified</>
-                ) : (
-                  <><Upload size={15} />Upload & Notify Doctor</>
-                )}
-              </button>
-              <button className="px-5 h-11 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B] hover:bg-[#F8FAFC]">
-                Save Draft
-              </button>
-            </div>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !selectedTestId || !resultData.trim()}
+              className="w-full h-11 rounded-lg bg-[#0EA5E9] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#0284C7] disabled:opacity-50 transition-colors"
+            >
+              {submitting ? (
+                <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+              ) : (
+                <><Upload size={16} /> Submit Result & Notify Doctor</>
+              )}
+            </button>
           </div>
         </div>
 
         {/* Recent Uploads */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-          <div className="px-5 py-4 border-b border-[#E2E8F0]">
-            <h3 className="font-semibold text-[#0F172A]">Recently Uploaded</h3>
+        <div className="bg-white rounded-xl border border-[#E2E8F0] self-start" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+          <div className="px-5 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+            <h3 className="font-semibold text-[#0F172A] flex items-center gap-2">
+              <CheckCircle size={16} className="text-[#10B981]" /> Recently Uploaded
+            </h3>
           </div>
           <div className="divide-y divide-[#F1F5F9]">
-            {recentUploads.map((item, i) => (
-              <div key={i} className="p-4 hover:bg-[#F8FAFC]">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-semibold text-[#0F172A]">{item.patient}</p>
-                  {item.flagged ? (
-                    <span className="flex items-center gap-1 text-xs text-[#EF4444] font-medium">
-                      <AlertTriangle size={12} />Critical
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-[#10B981] font-medium">
-                      <CheckCircle size={12} />Normal
-                    </span>
-                  )}
+            {recentlyUploaded.length === 0 ? (
+              <div className="p-8 text-center text-sm text-[#64748B]">No results uploaded today.</div>
+            ) : (
+              recentlyUploaded.map((item, i) => (
+                <div key={i} className="p-4 hover:bg-[#F8FAFC]">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold text-[#0F172A]">{getPatientName(item.patientId)}</p>
+                    <span className="text-xs text-[#64748B]">LAB-{item.id}</span>
+                  </div>
+                  <p className="text-xs font-medium text-[#0EA5E9]">{item.testTypeName}</p>
                 </div>
-                <p className="text-xs text-[#64748B]">{item.test}</p>
-                <p className="text-xs text-[#94A3B8] mt-1">Uploaded at {item.time}</p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { StatCard } from "../../components/ui/StatCard";
 import { billingApi, receptionistApi, adminApi } from "@/api";
+import { api } from "@/api/axios";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
 import type { InvoiceResponse } from "@/api/billing.api";
@@ -26,6 +27,9 @@ export function ReceptionistBilling() {
   const [amountReceived, setAmountReceived] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
+  // View Details Modal
+  const [viewInvoice, setViewInvoice] = useState<InvoiceResponse | null>(null);
+
   const getPatientDisplayName = (p: PatientProfileResponse) => {
     const u = users.find((user) => user.id === p.userId);
     return u ? `${u.firstName} ${u.lastName}` : `Patient Profile #${p.id}`;
@@ -33,27 +37,17 @@ export function ReceptionistBilling() {
 
   const loadData = () => {
     setLoading(true);
-    // Fetch all patients and pending/partially paid/overdue/paid invoices in parallel
+    // Fetch all patients, users, and invoices
     Promise.all([
       receptionistApi.getPatientsList(0, 100),
       adminApi.getUsers("PATIENT"),
-      billingApi.getInvoicesByStatus("PENDING"),
-      billingApi.getInvoicesByStatus("PARTIALLY_PAID"),
-      billingApi.getInvoicesByStatus("OVERDUE"),
-      billingApi.getInvoicesByStatus("PAID")
+      billingApi.getAllInvoices()
     ])
-      .then(([ptsPage, ptsUsers, pending, partial, overdue, paid]) => {
+      .then(([ptsPage, ptsUsers, invoicesRes]) => {
         setPatients(ptsPage.data.content || []);
         setUsers(ptsUsers.data || []);
-        // Combine all invoices
-        const allInvoices = [
-          ...pending.data,
-          ...partial.data,
-          ...overdue.data,
-          ...paid.data
-        ];
         // Sort by ID descending
-        allInvoices.sort((a, b) => b.id - a.id);
+        const allInvoices = [...invoicesRes.data].sort((a, b) => b.id - a.id);
         setInvoices(allInvoices);
       })
       .catch((err) => {
@@ -229,6 +223,12 @@ export function ReceptionistBilling() {
                           </td>
                           <td className="px-5 py-3.5">
                             <div className="flex gap-2">
+                              <button
+                                onClick={() => setViewInvoice(inv)}
+                                className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#64748B] text-xs font-semibold hover:bg-[#F8FAFC] cursor-pointer"
+                              >
+                                View Details
+                              </button>
                               {inv.status !== "PAID" && (
                                 <button
                                   onClick={() => {
@@ -312,6 +312,148 @@ export function ReceptionistBilling() {
                   Record Payment
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Invoice Modal */}
+      {viewInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold text-[#0F172A] text-lg">Invoice Details</h3>
+                <p className="text-xs text-[#64748B]">INV-{viewInvoice.id} • Issued {new Date(viewInvoice.issuedAt).toLocaleDateString()}</p>
+              </div>
+              <button className="cursor-pointer p-1.5 hover:bg-gray-100 rounded-full" onClick={() => setViewInvoice(null)}><X size={20} className="text-[#64748B]" /></button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6 text-sm bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4">
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Patient Name</p>
+                <p className="font-bold text-[#0F172A]">{viewInvoice.patientName || `Patient ID: ${viewInvoice.patientId}`}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Status</p>
+                <Badge variant={getStatusBadgeVariant(viewInvoice.status)}>{viewInvoice.status}</Badge>
+              </div>
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Total Amount</p>
+                <p className="font-bold text-[#0EA5E9]">${viewInvoice.totalAmount.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Paid Amount</p>
+                <p className="font-bold text-[#10B981]">${viewInvoice.paidAmount.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <h4 className="text-sm font-bold text-[#0F172A] mb-3">Line Items</h4>
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden mb-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-xs text-[#64748B] text-left">
+                    <th className="px-4 py-3 font-semibold">Description</th>
+                    <th className="px-4 py-3 font-semibold text-center">Qty</th>
+                    <th className="px-4 py-3 font-semibold text-right">Unit Price</th>
+                    <th className="px-4 py-3 font-semibold text-right">Total</th>
+                    {viewInvoice.status === "PENDING" && <th className="px-4 py-3 font-semibold text-center">Action</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1F5F9]">
+                  {viewInvoice.items.length === 0 ? (
+                    <tr><td colSpan={viewInvoice.status === "PENDING" ? 5 : 4} className="px-4 py-6 text-center text-[#64748B]">No items found on this invoice.</td></tr>
+                  ) : (
+                    viewInvoice.items.map(item => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-3 text-[#0F172A] font-medium">{item.description}</td>
+                        <td className="px-4 py-3 text-[#64748B] text-center">{item.quantity}</td>
+                        <td className="px-4 py-3 text-[#64748B] text-right">${item.amount.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-[#0F172A] font-bold text-right">${(item.quantity * item.amount).toFixed(2)}</td>
+                        {viewInvoice.status === "PENDING" && (
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.delete(`/api/billing/invoices/${viewInvoice.id}/items/${item.id}`);
+                                  toast.success("Item removed");
+                                  const { data } = await billingApi.getInvoiceById(viewInvoice.id);
+                                  setViewInvoice(data);
+                                  loadData();
+                                } catch(e) {
+                                  toast.error("Failed to remove item");
+                                }
+                              }}
+                              className="text-red-500 hover:bg-red-50 p-1 rounded-md"
+                            >
+                              <X size={14} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                  {viewInvoice.status === "PENDING" && (
+                    <tr className="bg-[#F8FAFC]">
+                      <td className="px-3 py-2">
+                        <input id="newItemDesc" placeholder="e.g. Pharmacy charge" className="w-full text-xs p-1.5 border rounded" />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input id="newItemQty" type="number" defaultValue={1} className="w-full text-xs p-1.5 border rounded text-center" />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input id="newItemPrice" type="number" placeholder="0.00" className="w-full text-xs p-1.5 border rounded text-right" />
+                      </td>
+                      <td className="px-3 py-2" colSpan={2}>
+                        <button
+                          onClick={async () => {
+                            const desc = (document.getElementById("newItemDesc") as HTMLInputElement).value;
+                            const qty = Number((document.getElementById("newItemQty") as HTMLInputElement).value);
+                            const price = Number((document.getElementById("newItemPrice") as HTMLInputElement).value);
+                            if(!desc || !qty || !price) return toast.error("Please fill all fields");
+                            try {
+                              await api.post(`/api/billing/invoices/${viewInvoice.id}/items`, { description: desc, quantity: qty, amount: price });
+                              toast.success("Item added");
+                              (document.getElementById("newItemDesc") as HTMLInputElement).value = "";
+                              const { data } = await billingApi.getInvoiceById(viewInvoice.id);
+                              setViewInvoice(data);
+                              loadData();
+                            } catch(e) {
+                              toast.error("Failed to add item");
+                            }
+                          }}
+                          className="w-full bg-[#10B981] text-white text-xs py-1.5 rounded font-medium hover:bg-[#059669]"
+                        >
+                          Add Item
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="bg-[#F8FAFC]">
+                    <td colSpan={3} className="px-4 py-3 text-right text-xs font-bold text-[#64748B] uppercase">Total</td>
+                    <td className="px-4 py-3 text-right font-bold text-[#0EA5E9] text-base">${viewInvoice.totalAmount.toFixed(2)}</td>
+                    {viewInvoice.status === "PENDING" && <td></td>}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setViewInvoice(null)} className="px-5 h-10 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#64748B] cursor-pointer hover:bg-gray-50">Close</button>
+              {viewInvoice.status !== "PAID" && (
+                <button
+                  onClick={() => {
+                    const inv = viewInvoice;
+                    setViewInvoice(null);
+                    setSelectedInvoice(inv);
+                    setAmountReceived((inv.totalAmount - inv.paidAmount).toFixed(2));
+                    setShowModal(true);
+                  }}
+                  className="px-5 h-10 rounded-lg bg-[#1E3A5F] text-white text-xs font-bold hover:opacity-90 cursor-pointer"
+                >
+                  Collect Payment
+                </button>
+              )}
             </div>
           </div>
         </div>

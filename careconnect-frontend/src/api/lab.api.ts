@@ -39,6 +39,13 @@ export interface LabResultResponse {
   interpretation?: string;
 }
 
+export interface LabResultCreateRequest {
+  labRequestId: number;
+  technicianId: number;
+  resultData: string;
+  interpretation?: string;
+}
+
 export interface ReferenceRangeCreateRequest {
   componentName: string;
   minNormal: number;
@@ -123,6 +130,9 @@ export const labApi = {
     api.post<MaintenanceResponse>(`/api/lab/equipment/${equipmentId}/maintenance`, body),
 
   // Lab Requests
+  getAllLabRequests: () =>
+    api.get<LabRequestResponse[]>("/api/lab/requests"),
+
   createLabRequest: (body: LabRequestCreateRequest) =>
     api.post<LabRequestResponse>("/api/lab/requests", body),
 
@@ -136,6 +146,9 @@ export const labApi = {
     api.get<LabRequestResponse[]>(`/api/lab/requests/doctor/${doctorId}`),
 
   // Results
+  uploadResult: (body: LabResultCreateRequest) =>
+    api.post<LabResultResponse>("/api/lab/results", body),
+
   getResultByLabRequestId: (labRequestId: number) =>
     api.get<LabResultResponse>(`/api/lab/results/request/${labRequestId}`),
 

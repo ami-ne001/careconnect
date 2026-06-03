@@ -55,6 +55,9 @@ export const billingApi = {
   createInvoice: (body: InvoiceCreateRequest) =>
     api.post<InvoiceResponse>("/api/billing/invoices", body),
 
+  getAllInvoices: () =>
+    api.get<InvoiceResponse[]>("/api/billing/invoices"),
+
   getInvoiceById: (id: number) =>
     api.get<InvoiceResponse>(`/api/billing/invoices/${id}`),
 

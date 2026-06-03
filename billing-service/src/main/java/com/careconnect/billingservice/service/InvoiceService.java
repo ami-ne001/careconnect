@@ -135,6 +135,13 @@ public class InvoiceService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<InvoiceResponse> getAllInvoices() {
+        return invoiceRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public InvoiceResponse addItemToInvoice(Long invoiceId, InvoiceItemCreateRequest request) {
         Invoice invoice = invoiceRepository.findById(invoiceId)

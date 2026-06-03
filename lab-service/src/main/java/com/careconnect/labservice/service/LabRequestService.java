@@ -98,6 +98,13 @@ public class LabRequestService {
     }
 
     @Transactional(readOnly = true)
+    public List<LabRequestResponse> getAllLabRequests() {
+        return labRequestRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<LabRequestResponse> getLabRequestsByConsultation(Long consultationId) {
         return labRequestRepository.findByConsultationId(consultationId).stream()
                 .map(this::mapToResponse)

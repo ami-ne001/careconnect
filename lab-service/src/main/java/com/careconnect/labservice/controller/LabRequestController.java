@@ -31,6 +31,12 @@ public class LabRequestController {
         return ResponseEntity.ok(labRequestService.getLabRequestById(id));
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('LAB_TECHNICIAN', 'ADMIN')")
+    public ResponseEntity<List<LabRequestResponse>> getAllLabRequests() {
+        return ResponseEntity.ok(labRequestService.getAllLabRequests());
+    }
+
     @GetMapping("/patient/{patientId}")
     @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'PATIENT', 'ADMIN')")
     public ResponseEntity<List<LabRequestResponse>> getLabRequestsByPatient(@PathVariable Long patientId) {
