@@ -3,7 +3,8 @@ import { api } from "./axios";
 export interface InvoiceItemResponse {
   id: number;
   description: string;
-  amount: number;
+  unitPrice: number;
+  totalPrice: number;
   quantity: number;
 }
 
@@ -25,35 +26,36 @@ export interface InvoiceResponse {
 
 export interface InvoiceCreateRequest {
   patientId: number;
-  sourceType: string;
-  sourceId: number;
-  items: {
-    description: string;
-    amount: number;
-    quantity: number;
-  }[];
+  consultationId?: number;
+  admissionId?: number;
+  surgeryId?: number;
+  dueDate?: string;
+  notes?: string;
 }
 
 export interface PaymentCreateRequest {
   invoiceId: number;
   amount: number;
-  paymentMethod: string;
-  referenceNumber?: string;
+  method: string;
+  reference?: string;
 }
 
 export interface PaymentResponse {
   id: number;
   invoiceId: number;
   amount: number;
-  paymentMethod: string;
-  referenceNumber?: string;
-  paymentDate: string;
+  method: string;
+  reference?: string;
+  paidAt: string;
   receivedBy?: number;
 }
 
 export const billingApi = {
   createInvoice: (body: InvoiceCreateRequest) =>
     api.post<InvoiceResponse>("/api/billing/invoices", body),
+
+  getAllInvoices: () =>
+    api.get<InvoiceResponse[]>("/api/billing/invoices"),
 
   getInvoiceById: (id: number) =>
     api.get<InvoiceResponse>(`/api/billing/invoices/${id}`),

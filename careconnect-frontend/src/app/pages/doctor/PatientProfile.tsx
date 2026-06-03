@@ -1,8 +1,13 @@
-import { useState } from "react";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, Download, Search } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
+import { labApi, billingApi } from "@/api";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/utils/apiError";
+import type { LabRequestResponse } from "@/api/lab.api";
+import type { InvoiceResponse } from "@/api/billing.api";
 
 const vitals = [
   { label: "Blood Pressure", value: "128/84", unit: "mmHg", trend: "up", normal: "120/80" },
@@ -27,12 +32,28 @@ const medications = [
   { name: "Lisinopril 10mg", freq: "1 tablet twice daily", since: "Jun 2024" },
 ];
 
-const tabs = ["Overview", "Medical History", "Appointments", "Prescriptions", "Lab Results", "Admissions", "Surgeries", "Documents"];
+const tabs = ["Overview", "Medical History", "Appointments", "Prescriptions", "Lab Results", "Admissions", "Surgeries", "Invoices", "Documents"];
 
 export function PatientProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Overview");
+
+  const [labRequests, setLabRequests] = useState<LabRequestResponse[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
+  const [loadingExtra, setLoadingExtra] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoadingExtra(true);
+    Promise.all([
+      labApi.getLabRequestsByPatient(Number(id)).catch(() => ({ data: [] })),
+      billingApi.getInvoicesByPatient(Number(id)).catch(() => ({ data: [] }))
+    ]).then(([labRes, invRes]) => {
+      setLabRequests(labRes.data);
+      setInvoices(invRes.data);
+    }).finally(() => setLoadingExtra(false));
+  }, [id]);
 
   return (
     <div>
@@ -263,7 +284,80 @@ export function PatientProfile() {
         </div>
       )}
 
-      {activeTab !== "Overview" && activeTab !== "Admissions" && activeTab !== "Surgeries" && (
+      {activeTab === "Lab Results" && (
+        <div className="bg-white rounded-xl border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+          <div className="px-5 py-4 border-b border-[#E2E8F0]">
+            <h3 className="font-semibold text-[#0F172A]">Lab Results</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                  {["Test Type", "Status", "Order Date", "Urgency", "Notes"].map((h) => (
+                    <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loadingExtra ? (
+                  <tr><td colSpan={5} className="px-5 py-8 text-center text-[#64748B]">Loading...</td></tr>
+                ) : labRequests.length === 0 ? (
+                  <tr><td colSpan={5} className="px-5 py-8 text-center text-[#64748B]">No lab requests found.</td></tr>
+                ) : (
+                  labRequests.map((req, i) => (
+                    <tr key={req.id} className={`border-b border-[#F1F5F9] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
+                      <td className="px-5 py-3.5 font-medium text-[#0F172A]">{req.testTypeName}</td>
+                      <td className="px-5 py-3.5"><Badge variant={req.status === "COMPLETED" ? "active" : "pending"}>{req.status}</Badge></td>
+                      <td className="px-5 py-3.5 text-[#64748B]">{new Date(req.requestedAt).toLocaleDateString()}</td>
+                      <td className="px-5 py-3.5"><Badge variant={req.priority === "URGENT" || req.priority === "CRITICAL" ? "critical" : "completed"}>{req.priority}</Badge></td>
+                      <td className="px-5 py-3.5 text-[#64748B] max-w-[200px] truncate">—</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "Invoices" && (
+        <div className="bg-white rounded-xl border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+          <div className="px-5 py-4 border-b border-[#E2E8F0]">
+            <h3 className="font-semibold text-[#0F172A]">Billing History</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                  {["Invoice #", "Date", "Status", "Total", "Paid", "Outstanding"].map((h) => (
+                    <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loadingExtra ? (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-[#64748B]">Loading...</td></tr>
+                ) : invoices.length === 0 ? (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-[#64748B]">No invoices found.</td></tr>
+                ) : (
+                  invoices.map((inv, i) => (
+                    <tr key={inv.id} className={`border-b border-[#F1F5F9] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
+                      <td className="px-5 py-3.5 font-medium text-[#0EA5E9]">INV-{inv.id}</td>
+                      <td className="px-5 py-3.5 text-[#64748B]">{new Date(inv.issuedAt).toLocaleDateString()}</td>
+                      <td className="px-5 py-3.5"><Badge variant={inv.status === "PAID" ? "active" : "pending"}>{inv.status}</Badge></td>
+                      <td className="px-5 py-3.5 font-bold text-[#0F172A]">${inv.totalAmount.toFixed(2)}</td>
+                      <td className="px-5 py-3.5 font-medium text-[#10B981]">${inv.paidAmount.toFixed(2)}</td>
+                      <td className="px-5 py-3.5 font-bold text-[#EF4444]">${(inv.totalAmount - inv.paidAmount).toFixed(2)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab !== "Overview" && activeTab !== "Admissions" && activeTab !== "Surgeries" && activeTab !== "Lab Results" && activeTab !== "Invoices" && (
         <div className="bg-white rounded-xl p-8 border border-[#E2E8F0] text-center" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
           <p className="text-[#64748B] text-sm">Select a tab to view {activeTab} details for this patient.</p>
         </div>

@@ -18,6 +18,7 @@ export function PatientBilling() {
   // Payment states
   const [payModal, setPayModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceResponse | null>(null);
+  const [viewInvoice, setViewInvoice] = useState<InvoiceResponse | null>(null);
   const [payMethod, setPayMethod] = useState<"CARD" | "INSURANCE">("CARD");
   const [submitting, setSubmitting] = useState(false);
   const [paySuccess, setPaySuccess] = useState(false);
@@ -64,8 +65,8 @@ export function PatientBilling() {
       await billingApi.recordPayment({
         invoiceId: selectedInvoice.id,
         amount: selectedInvoice.totalAmount - selectedInvoice.paidAmount,
-        paymentMethod: payMethod,
-        referenceNumber: payMethod === "CARD" ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : "INS-CLAIM-DIRECT",
+        method: payMethod,
+        reference: payMethod === "CARD" ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : "INS-CLAIM-DIRECT",
       });
 
       setPaySuccess(true);
@@ -191,20 +192,28 @@ export function PatientBilling() {
                             </Badge>
                           </td>
                           <td className="px-5 py-3.5">
-                            {inv.status === "PAID" ? (
-                              <span className="text-[#10B981] text-xs font-semibold">✓ Completed</span>
-                            ) : (
+                            <div className="flex items-center gap-3">
                               <button
-                                onClick={() => {
-                                  setSelectedInvoice(inv);
-                                  setPayModal(true);
-                                }}
-                                className="flex items-center gap-1 text-[#0EA5E9] text-xs font-semibold hover:underline cursor-pointer"
+                                onClick={() => setViewInvoice(inv)}
+                                className="text-[#64748B] text-xs font-semibold hover:text-[#0EA5E9] cursor-pointer"
                               >
-                                <CreditCard size={12} />
-                                Pay Now
+                                View Details
                               </button>
-                            )}
+                              {inv.status === "PAID" ? (
+                                <span className="text-[#10B981] text-xs font-semibold">✓ Completed</span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setSelectedInvoice(inv);
+                                    setPayModal(true);
+                                  }}
+                                  className="flex items-center gap-1 text-[#0EA5E9] text-xs font-semibold hover:underline cursor-pointer"
+                                >
+                                  <CreditCard size={12} />
+                                  Pay Now
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -320,6 +329,85 @@ export function PatientBilling() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* View Invoice Modal */}
+      {viewInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold text-[#0F172A] text-lg">Invoice Details</h3>
+                <p className="text-xs text-[#64748B]">INV-{viewInvoice.id} • Issued {new Date(viewInvoice.issuedAt).toLocaleDateString()}</p>
+              </div>
+              <button className="cursor-pointer p-1.5 hover:bg-gray-100 rounded-full" onClick={() => setViewInvoice(null)}><X size={20} className="text-[#64748B]" /></button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6 text-sm bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4">
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Status</p>
+                <Badge variant={viewInvoice.status === "PAID" ? "active" : "pending"}>{viewInvoice.status}</Badge>
+              </div>
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Total Amount</p>
+                <p className="font-bold text-[#0EA5E9]">${viewInvoice.totalAmount.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Paid Amount</p>
+                <p className="font-bold text-[#10B981]">${viewInvoice.paidAmount.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <h4 className="text-sm font-bold text-[#0F172A] mb-3">Line Items</h4>
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden mb-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-xs text-[#64748B] text-left">
+                    <th className="px-4 py-3 font-semibold">Description</th>
+                    <th className="px-4 py-3 font-semibold text-center">Qty</th>
+                    <th className="px-4 py-3 font-semibold text-right">Unit Price</th>
+                    <th className="px-4 py-3 font-semibold text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1F5F9]">
+                  {viewInvoice.items.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-6 text-center text-[#64748B]">No items found on this invoice.</td></tr>
+                  ) : (
+                    viewInvoice.items.map(item => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-3 text-[#0F172A] font-medium">{item.description}</td>
+                        <td className="px-4 py-3 text-[#64748B] text-center">{item.quantity}</td>
+                        <td className="px-4 py-3 text-[#64748B] text-right">${item.unitPrice.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-[#0F172A] font-bold text-right">${(item.quantity * item.unitPrice).toFixed(2)}</td>
+                      </tr>
+                    ))
+                  )}
+                  <tr className="bg-[#F8FAFC]">
+                    <td colSpan={3} className="px-4 py-3 text-right text-xs font-bold text-[#64748B] uppercase">Total</td>
+                    <td className="px-4 py-3 text-right font-bold text-[#0EA5E9] text-base">${viewInvoice.totalAmount.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setViewInvoice(null)} className="px-5 h-10 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#64748B] cursor-pointer hover:bg-gray-50">Close</button>
+              {viewInvoice.status !== "PAID" && (
+                <button
+                  onClick={() => {
+                    const inv = viewInvoice;
+                    setViewInvoice(null);
+                    setSelectedInvoice(inv);
+                    setPayModal(true);
+                  }}
+                  className="px-5 h-10 rounded-lg bg-[#1E3A5F] text-white text-xs font-bold hover:opacity-90 cursor-pointer"
+                >
+                  Pay Now
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

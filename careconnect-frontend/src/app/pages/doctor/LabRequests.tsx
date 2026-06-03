@@ -222,7 +222,7 @@ export function DoctorLabRequests() {
                     </div>
                   </div>
                 )}
-                <p className="text-xs text-gray-400 mt-2">Tested at: {new Date(selectedResult.testedAt).toLocaleString()}</p>
+                <p className="text-xs text-gray-400 mt-2">Tested at: {new Date(selectedResult.uploadedAt).toLocaleString()}</p>
               </div>
             ) : (
               <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm flex items-center gap-2">
