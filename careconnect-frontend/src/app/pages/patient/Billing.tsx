@@ -65,8 +65,8 @@ export function PatientBilling() {
       await billingApi.recordPayment({
         invoiceId: selectedInvoice.id,
         amount: selectedInvoice.totalAmount - selectedInvoice.paidAmount,
-        paymentMethod: payMethod,
-        referenceNumber: payMethod === "CARD" ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : "INS-CLAIM-DIRECT",
+        method: payMethod,
+        reference: payMethod === "CARD" ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : "INS-CLAIM-DIRECT",
       });
 
       setPaySuccess(true);
@@ -379,8 +379,8 @@ export function PatientBilling() {
                       <tr key={item.id}>
                         <td className="px-4 py-3 text-[#0F172A] font-medium">{item.description}</td>
                         <td className="px-4 py-3 text-[#64748B] text-center">{item.quantity}</td>
-                        <td className="px-4 py-3 text-[#64748B] text-right">${item.amount.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-[#0F172A] font-bold text-right">${(item.quantity * item.amount).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-[#64748B] text-right">${item.unitPrice.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-[#0F172A] font-bold text-right">${(item.quantity * item.unitPrice).toFixed(2)}</td>
                       </tr>
                     ))
                   )}

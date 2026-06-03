@@ -91,8 +91,8 @@ export function ReceptionistBilling() {
       await billingApi.recordPayment({
         invoiceId: selectedInvoice.id,
         amount,
-        paymentMethod: payMethod,
-        referenceNumber: payMethod === "CARD" ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : "FRONT-DESK-CASH",
+        method: payMethod,
+        reference: payMethod === "CARD" ? `TXN-${Math.floor(100000 + Math.random() * 900000)}` : "FRONT-DESK-CASH",
       });
 
       toast.success("Payment processed successfully!");
@@ -368,8 +368,8 @@ export function ReceptionistBilling() {
                       <tr key={item.id}>
                         <td className="px-4 py-3 text-[#0F172A] font-medium">{item.description}</td>
                         <td className="px-4 py-3 text-[#64748B] text-center">{item.quantity}</td>
-                        <td className="px-4 py-3 text-[#64748B] text-right">${item.amount.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-[#0F172A] font-bold text-right">${(item.quantity * item.amount).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-[#64748B] text-right">${item.unitPrice.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-[#0F172A] font-bold text-right">${(item.quantity * item.unitPrice).toFixed(2)}</td>
                         {viewInvoice.status === "PENDING" && (
                           <td className="px-4 py-3 text-center">
                             <button
@@ -412,8 +412,8 @@ export function ReceptionistBilling() {
                             const price = Number((document.getElementById("newItemPrice") as HTMLInputElement).value);
                             if(!desc || !qty || !price) return toast.error("Please fill all fields");
                             try {
-                              await api.post(`/api/billing/invoices/${viewInvoice.id}/items`, { description: desc, quantity: qty, amount: price });
-                              toast.success("Item added");
+                              await api.post(`/api/billing/invoices/${viewInvoice.id}/items`, { description: desc, quantity: qty, unitPrice: price });
+                              toast.success("Item added successfully");
                               (document.getElementById("newItemDesc") as HTMLInputElement).value = "";
                               const { data } = await billingApi.getInvoiceById(viewInvoice.id);
                               setViewInvoice(data);

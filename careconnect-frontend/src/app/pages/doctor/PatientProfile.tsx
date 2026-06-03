@@ -47,7 +47,7 @@ export function PatientProfile() {
     if (!id) return;
     setLoadingExtra(true);
     Promise.all([
-      labApi.getRequestsByPatientId(Number(id)).catch(() => ({ data: [] })),
+      labApi.getLabRequestsByPatient(Number(id)).catch(() => ({ data: [] })),
       billingApi.getInvoicesByPatient(Number(id)).catch(() => ({ data: [] }))
     ]).then(([labRes, invRes]) => {
       setLabRequests(labRes.data);
@@ -308,9 +308,9 @@ export function PatientProfile() {
                     <tr key={req.id} className={`border-b border-[#F1F5F9] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
                       <td className="px-5 py-3.5 font-medium text-[#0F172A]">{req.testTypeName}</td>
                       <td className="px-5 py-3.5"><Badge variant={req.status === "COMPLETED" ? "active" : "pending"}>{req.status}</Badge></td>
-                      <td className="px-5 py-3.5 text-[#64748B]">{new Date(req.orderDate).toLocaleDateString()}</td>
-                      <td className="px-5 py-3.5"><Badge variant={req.isUrgent ? "critical" : "completed"}>{req.isUrgent ? "Urgent" : "Normal"}</Badge></td>
-                      <td className="px-5 py-3.5 text-[#64748B] max-w-[200px] truncate">{req.notes || "—"}</td>
+                      <td className="px-5 py-3.5 text-[#64748B]">{new Date(req.requestedAt).toLocaleDateString()}</td>
+                      <td className="px-5 py-3.5"><Badge variant={req.priority === "URGENT" || req.priority === "CRITICAL" ? "critical" : "completed"}>{req.priority}</Badge></td>
+                      <td className="px-5 py-3.5 text-[#64748B] max-w-[200px] truncate">—</td>
                     </tr>
                   ))
                 )}
