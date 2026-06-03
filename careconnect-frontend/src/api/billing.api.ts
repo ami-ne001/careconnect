@@ -26,13 +26,11 @@ export interface InvoiceResponse {
 
 export interface InvoiceCreateRequest {
   patientId: number;
-  sourceType: string;
-  sourceId: number;
-  items: {
-    description: string;
-    amount: number;
-    quantity: number;
-  }[];
+  consultationId?: number;
+  admissionId?: number;
+  surgeryId?: number;
+  dueDate?: string;
+  notes?: string;
 }
 
 export interface PaymentCreateRequest {

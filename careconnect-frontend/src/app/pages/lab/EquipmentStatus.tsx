@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Wrench, CheckCircle, AlertTriangle, XCircle, Power, PowerOff } from "lucide-react";
+import { Plus, Wrench, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { labApi, EquipmentResponse, MaintenanceResponse } from "../../../api/lab.api";
@@ -10,16 +10,15 @@ const statusConfig: Record<string, {
   icon: React.ReactNode;
   bg: string;
 }> = {
-  ACTIVE: { label: "Operational", variant: "active", icon: <CheckCircle size={16} className="text-[#10B981]" />, bg: "bg-[#F0FDF4]" },
+  OPERATIONAL: { label: "Operational", variant: "active", icon: <CheckCircle size={16} className="text-[#10B981]" />, bg: "bg-[#F0FDF4]" },
   MAINTENANCE: { label: "Under Maintenance", variant: "pending", icon: <Wrench size={16} className="text-[#F59E0B]" />, bg: "bg-[#FFFBEB]" },
-  BROKEN: { label: "Offline/Broken", variant: "critical", icon: <XCircle size={16} className="text-[#EF4444]" />, bg: "bg-[#FEF2F2]" },
-  RETIRED: { label: "Retired", variant: "inactive", icon: <PowerOff size={16} className="text-[#64748B]" />, bg: "bg-[#F8FAFC]" },
+  OFFLINE: { label: "Offline", variant: "critical", icon: <XCircle size={16} className="text-[#EF4444]" />, bg: "bg-[#FEF2F2]" },
 };
 
 const resolutionVariant = (r: string) => {
   if (r === "RESOLVED") return "active";
   if (r === "IN_PROGRESS") return "pending";
-  return "inactive";
+  return "inactive"; // OPEN
 };
 
 export function LabEquipmentStatus() {
@@ -82,7 +81,7 @@ export function LabEquipmentStatus() {
           {/* Equipment Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 mb-6">
             {equipment.map((eq) => {
-              const cfg = statusConfig[eq.status] || statusConfig.RETIRED;
+              const cfg = statusConfig[eq.status] || statusConfig.OFFLINE;
               return (
                 <div
                   key={eq.id}
@@ -100,16 +99,16 @@ export function LabEquipmentStatus() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-[#64748B]">Last Calibrated</span>
-                      <span className="font-medium text-[#0F172A]">{formatDate(eq.lastCalibrationDate)}</span>
+                      <span className="font-medium text-[#0F172A]">{formatDate(eq.lastCalibrated)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[#64748B]">Next Due</span>
-                      <span className={`font-medium ${eq.status === "BROKEN" ? "text-[#EF4444]" : "text-[#0F172A]"}`}>
-                        {formatDate(eq.nextCalibrationDate)}
+                      <span className={`font-medium ${eq.status === "OFFLINE" ? "text-[#EF4444]" : "text-[#0F172A]"}`}>
+                        {formatDate(eq.nextCalibration)}
                       </span>
                     </div>
                   </div>
-                  {eq.status !== "ACTIVE" && (
+                  {eq.status !== "OPERATIONAL" && (
                     <button className="mt-4 w-full h-8 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5">
                       <AlertTriangle size={12} />View Issue
                     </button>
@@ -140,7 +139,7 @@ export function LabEquipmentStatus() {
                   {maintenanceLog.map((row, i) => (
                     <tr key={row.id} className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}>
                       <td className="px-5 py-3.5 font-medium text-[#0F172A]">{getEquipmentName(row.equipmentId)}</td>
-                      <td className="px-5 py-3.5 text-[#64748B] max-w-[200px]">{row.issueDescription}</td>
+                      <td className="px-5 py-3.5 text-[#64748B] max-w-[200px]">{row.issue}</td>
                       <td className="px-5 py-3.5 text-[#64748B] whitespace-nowrap">{formatDate(row.reportedAt)}</td>
                       <td className="px-5 py-3.5">
                         <Badge variant={resolutionVariant(row.status) as any} dot>{row.status.replace('_', ' ')}</Badge>

@@ -72,25 +72,28 @@ export interface EquipmentResponse {
   id: number;
   name: string;
   type: string;
-  status: "ACTIVE" | "MAINTENANCE" | "BROKEN" | "RETIRED";
-  lastCalibrationDate?: string;
-  nextCalibrationDate?: string;
+  serialNumber?: string;
+  status: "OPERATIONAL" | "MAINTENANCE" | "OFFLINE";
+  lastCalibrated?: string;
+  nextCalibration?: string;
   notes?: string;
 }
 
 export interface MaintenanceResponse {
   id: number;
   equipmentId: number;
-  issueDescription: string;
-  reportedBy: number;
+  issue: string;
+  resolution?: string;
+  reportedBy?: number;
   reportedAt: string;
   resolvedAt?: string;
-  resolutionNotes?: string;
-  status: "PENDING" | "IN_PROGRESS" | "RESOLVED";
+  status: "OPEN" | "IN_PROGRESS" | "RESOLVED";
 }
 
 export interface MaintenanceCreateRequest {
-  issueDescription: string;
+  equipmentId: number;
+  reportedBy: number;
+  issue: string;
 }
 
 export interface LabTestTypeCreateRequest {
