@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import { Plus, Wrench, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { Plus, Wrench, CheckCircle, AlertTriangle, XCircle, X } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { labApi, EquipmentResponse, MaintenanceResponse } from "../../../api/lab.api";
+import { useAuth } from "../../../store/useAuth";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 const statusConfig: Record<string, {
   label: string;
@@ -22,9 +25,19 @@ const resolutionVariant = (r: string) => {
 };
 
 export function LabEquipmentStatus() {
+  const { userId } = useAuth();
   const [equipment, setEquipment] = useState<EquipmentResponse[]>([]);
   const [maintenanceLog, setMaintenanceLog] = useState<MaintenanceResponse[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modals
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  
+  // Forms
+  const [eqForm, setEqForm] = useState({ name: "", type: "", serialNumber: "", lastCalibrated: "", nextCalibration: "", notes: "" });
+  const [issueForm, setIssueForm] = useState({ equipmentId: "", issue: "" });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadEquipment();
@@ -62,13 +75,59 @@ export function LabEquipmentStatus() {
     return new Date(dateStr).toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const handleAddEquipment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await labApi.createEquipment({
+        name: eqForm.name,
+        type: eqForm.type,
+        serialNumber: eqForm.serialNumber,
+        lastCalibrated: eqForm.lastCalibrated || undefined,
+        nextCalibration: eqForm.nextCalibration || undefined,
+        notes: eqForm.notes
+      });
+      toast.success("Equipment added successfully");
+      setShowAddModal(false);
+      setEqForm({ name: "", type: "", serialNumber: "", lastCalibrated: "", nextCalibration: "", notes: "" });
+      loadEquipment();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to add equipment"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReportIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId) return;
+    setSubmitting(true);
+    try {
+      await labApi.reportMaintenance(Number(issueForm.equipmentId), {
+        equipmentId: Number(issueForm.equipmentId),
+        reportedBy: userId,
+        issue: issueForm.issue
+      });
+      // Optionally update equipment status to MAINTENANCE
+      await labApi.updateEquipmentStatus(Number(issueForm.equipmentId), "MAINTENANCE");
+      toast.success("Issue reported successfully");
+      setShowIssueModal(false);
+      setIssueForm({ equipmentId: "", issue: "" });
+      loadEquipment();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to report issue"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
         title="Equipment Status"
         subtitle="Monitor lab equipment and maintenance schedules"
         actions={
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold hover:bg-[#162d4a]">
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold hover:bg-[#162d4a]">
             <Plus size={15} />Add Equipment
           </button>
         }
@@ -109,7 +168,14 @@ export function LabEquipmentStatus() {
                     </div>
                   </div>
                   {eq.status !== "OPERATIONAL" && (
-                    <button className="mt-4 w-full h-8 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5">
+                    <button 
+                      onClick={() => {
+                        const latestIssue = maintenanceLog.find(l => l.equipmentId === eq.id && l.status !== "RESOLVED");
+                        if (latestIssue) {
+                           toast.info(`Current Issue: ${latestIssue.issue}`);
+                        }
+                      }}
+                      className="mt-4 w-full h-8 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5 cursor-pointer">
                       <AlertTriangle size={12} />View Issue
                     </button>
                   )}
@@ -122,7 +188,7 @@ export function LabEquipmentStatus() {
           <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
               <h3 className="font-semibold text-[#0F172A]">Maintenance Log</h3>
-              <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#EF4444]/10 text-[#EF4444] text-xs font-medium hover:bg-[#EF4444]/20">
+              <button onClick={() => setShowIssueModal(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#EF4444]/10 text-[#EF4444] text-xs font-medium hover:bg-[#EF4444]/20 cursor-pointer">
                 <Plus size={13} />Report Issue
               </button>
             </div>
@@ -157,6 +223,77 @@ export function LabEquipmentStatus() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Add Equipment Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-[#0F172A]">Add Equipment</h3>
+              <button onClick={() => setShowAddModal(false)}><X size={18} className="text-[#64748B]" /></button>
+            </div>
+            <form onSubmit={handleAddEquipment} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Name <span className="text-red-500">*</span></label>
+                <input required value={eqForm.name} onChange={e => setEqForm({...eqForm, name: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Type</label>
+                <input value={eqForm.type} onChange={e => setEqForm({...eqForm, type: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Serial Number</label>
+                <input value={eqForm.serialNumber} onChange={e => setEqForm({...eqForm, serialNumber: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                 <div>
+                    <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Last Calibrated</label>
+                    <input type="date" value={eqForm.lastCalibrated} onChange={e => setEqForm({...eqForm, lastCalibrated: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Next Calibration</label>
+                    <input type="date" value={eqForm.nextCalibration} onChange={e => setEqForm({...eqForm, nextCalibration: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                 </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B]">Cancel</button>
+                <button type="submit" disabled={submitting} className="flex-1 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold disabled:opacity-50">Submit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Report Issue Modal */}
+      {showIssueModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-[#0F172A]">Report Issue</h3>
+              <button onClick={() => setShowIssueModal(false)}><X size={18} className="text-[#64748B]" /></button>
+            </div>
+            <form onSubmit={handleReportIssue} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Equipment <span className="text-red-500">*</span></label>
+                <select required value={issueForm.equipmentId} onChange={e => setIssueForm({...issueForm, equipmentId: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]">
+                  <option value="">Select equipment...</option>
+                  {equipment.map(eq => (
+                    <option key={eq.id} value={eq.id}>{eq.name} ({eq.type || 'N/A'})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Issue Description <span className="text-red-500">*</span></label>
+                <textarea required rows={4} value={issueForm.issue} onChange={e => setIssueForm({...issueForm, issue: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" placeholder="Describe the problem..." />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowIssueModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B]">Cancel</button>
+                <button type="submit" disabled={submitting} className="flex-1 h-10 rounded-lg bg-[#EF4444] text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50">Report</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -79,6 +79,15 @@ export interface EquipmentResponse {
   notes?: string;
 }
 
+export interface EquipmentCreateRequest {
+  name: string;
+  type?: string;
+  serialNumber?: string;
+  lastCalibrated?: string;
+  nextCalibration?: string;
+  notes?: string;
+}
+
 export interface MaintenanceResponse {
   id: number;
   equipmentId: number;
@@ -121,6 +130,9 @@ export const labApi = {
   // Equipment
   getAllEquipment: () =>
     api.get<EquipmentResponse[]>("/api/lab/equipment"),
+
+  createEquipment: (body: EquipmentCreateRequest) =>
+    api.post<EquipmentResponse>("/api/lab/equipment", body),
 
   updateEquipmentStatus: (id: number, status: string) =>
     api.patch<EquipmentResponse>(`/api/lab/equipment/${id}/status`, { status }),

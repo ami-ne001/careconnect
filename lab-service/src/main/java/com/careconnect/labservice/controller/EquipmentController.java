@@ -23,7 +23,7 @@ public class EquipmentController {
     private final EquipmentService equipmentService;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('LAB_TECHNICIAN', 'ADMIN')")
     public ResponseEntity<EquipmentResponse> addEquipment(@Valid @RequestBody EquipmentCreateRequest request) {
         return ResponseEntity.ok(equipmentService.addEquipment(request));
     }
