@@ -1,13 +1,17 @@
 package com.careconnect.clinicalservice.controller;
 
+import com.careconnect.clinicalservice.dto.OperatingRoomOverviewResponse;
 import com.careconnect.clinicalservice.dto.OperatingRoomResponse;
 import com.careconnect.clinicalservice.enums.OperatingRoomStatus;
+import com.careconnect.clinicalservice.service.OperatingRoomAdminService;
 import com.careconnect.clinicalservice.service.OperatingRoomService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -17,11 +21,19 @@ import java.util.Map;
 public class OperatingRoomController {
 
     private final OperatingRoomService operatingRoomService;
+    private final OperatingRoomAdminService operatingRoomAdminService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN')")
     public ResponseEntity<List<OperatingRoomResponse>> getAllOperatingRooms() {
         return ResponseEntity.ok(operatingRoomService.getAllOperatingRooms());
+    }
+
+    @GetMapping("/overview")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'NURSE', 'ADMIN')")
+    public ResponseEntity<OperatingRoomOverviewResponse> getOverview(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
+        return ResponseEntity.ok(operatingRoomAdminService.getOverview(weekStart));
     }
 
     @GetMapping("/{id}")

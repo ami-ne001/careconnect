@@ -12,5 +12,7 @@ public interface SurgeryRepository extends JpaRepository<Surgery, Long> {
     List<Surgery> findByLeadSurgeonId(Long leadSurgeonId);
     List<Surgery> findByOperatingRoomId(Long operatingRoomId);
 
+    List<Surgery> findByOperatingRoomIdOrderByScheduledAtAsc(Long operatingRoomId);
+
     List<Surgery> findByScheduledAtBetween(LocalDateTime start, LocalDateTime end);
 }
