@@ -1,94 +1,119 @@
 import { useState, useEffect } from "react";
-import { Upload, CheckCircle, Search, AlertCircle } from "lucide-react";
+import { Upload, ArrowLeft, FlaskConical, AlertCircle, CheckCircle } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { labApi, LabRequestResponse } from "../../../api/lab.api";
-import { receptionistApi } from "../../../api/receptionist.api";
+import { labApi, LabRequestResponse, ReferenceRangeResponse } from "../../../api/lab.api";
+import { patientApi } from "../../../api/patient.api";
 import { useAuth } from "../../../store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "../../../utils/apiError";
+import { useParams, useNavigate } from "react-router";
 
 export function LabResultsUpload() {
+  const { id } = useParams();
+  const navigate = useNavigate();
   const { userId } = useAuth();
-  const [requests, setRequests] = useState<LabRequestResponse[]>([]);
-  const [patients, setPatients] = useState<Record<number, string>>({});
+  
+  const [request, setRequest] = useState<LabRequestResponse | null>(null);
+  const [patientName, setPatientName] = useState("");
+  const [referenceRanges, setReferenceRanges] = useState<ReferenceRangeResponse[]>([]);
+  
   const [loading, setLoading] = useState(true);
-
-  const [selectedTestId, setSelectedTestId] = useState<number | "">("");
-  const [resultData, setResultData] = useState("");
-  const [interpretation, setInterpretation] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [recentlyUploaded, setRecentlyUploaded] = useState<LabRequestResponse[]>([]);
+  
+  // Form State
+  const [resultValues, setResultValues] = useState<Record<string, string>>({});
+  const [unstructuredData, setUnstructuredData] = useState("");
+  const [interpretation, setInterpretation] = useState("");
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (id) {
+      loadData(Number(id));
+    }
+  }, [id]);
 
-  const loadData = async () => {
+  const loadData = async (reqId: number) => {
     try {
       setLoading(true);
-      const [reqsRes, patientsRes] = await Promise.all([
-        labApi.getAllLabRequests(),
-        receptionistApi.getPatientsList(0, 1000)
-      ]);
       
-      setRequests(reqsRes.data);
+      // 1. Fetch Request
+      const reqRes = await labApi.getAllLabRequests(); // (or get by id if we implement it)
+      const req = reqRes.data.find(r => r.id === reqId);
       
-      const pMap: Record<number, string> = {};
-      (patientsRes.data.content || []).forEach(p => {
-        if (p.userId) {
-          pMap[p.userId] = `${p.firstName} ${p.lastName}`.trim();
-        }
+      if (!req) {
+        toast.error("Lab request not found.");
+        navigate("/lab/test-requests");
+        return;
+      }
+      
+      setRequest(req);
+
+      // 2. Fetch Patient Name
+      try {
+        const pRes = await patientApi.getProfileById(req.patientId);
+        setPatientName(`${pRes.data.firstName} ${pRes.data.lastName}`.trim());
+      } catch (e) {
+        setPatientName(`Patient #${req.patientId}`);
+      }
+
+      // 3. Fetch Reference Ranges
+      const rangeRes = await labApi.getReferenceRanges(req.testTypeId);
+      setReferenceRanges(rangeRes.data);
+      
+      // Initialize results object
+      const initialVals: Record<string, string> = {};
+      rangeRes.data.forEach(r => {
+        initialVals[r.component] = "";
       });
-      setPatients(pMap);
-
-      // Pre-fill recently uploaded based on COMPLETED status today
-      const today = new Date().toDateString();
-      const completed = reqsRes.data.filter(r => r.status === "COMPLETED" && new Date(r.requestedAt).toDateString() === today);
-      setRecentlyUploaded(completed.slice(0, 5));
-
+      setResultValues(initialVals);
+      
     } catch (error) {
-      console.error("Failed to load requests for upload", error);
+      console.error("Failed to load upload data", error);
+      toast.error("Failed to load test details");
     } finally {
       setLoading(false);
     }
   };
 
-  const getPatientName = (patientId: number) => {
-    return patients[patientId] || `Patient #${patientId}`;
+  const handleComponentChange = (component: string, value: string) => {
+    setResultValues(prev => ({ ...prev, [component]: value }));
   };
 
   const handleSubmit = async () => {
-    if (!selectedTestId || !userId) {
-      toast.error("Select a test to upload results for.");
+    if (!request || !userId) return;
+
+    // Check if any structured data is missing
+    const missingStructured = referenceRanges.some(r => !resultValues[r.component]?.trim());
+    if (referenceRanges.length > 0 && missingStructured) {
+      toast.error("Please fill in all reference range fields.");
       return;
     }
-    if (!resultData.trim()) {
-      toast.error("Result values are required.");
+    
+    if (referenceRanges.length === 0 && !unstructuredData.trim()) {
+      toast.error("Please provide result data.");
       return;
     }
 
     try {
       setSubmitting(true);
+      
+      // Construct final result data
+      let finalData = "";
+      if (referenceRanges.length > 0) {
+        finalData = JSON.stringify(resultValues, null, 2);
+      } else {
+        finalData = unstructuredData;
+      }
+
       await labApi.uploadResult({
-        labRequestId: Number(selectedTestId),
+        labRequestId: request.id,
         technicianId: userId,
-        resultData,
+        resultData: finalData,
         interpretation
       });
       
       toast.success("Results uploaded successfully and doctor notified.");
+      navigate("/lab/test-requests");
       
-      // Update UI state
-      setResultData("");
-      setInterpretation("");
-      const completedReq = requests.find(r => r.id === Number(selectedTestId));
-      if (completedReq) {
-        setRecentlyUploaded([completedReq, ...recentlyUploaded]);
-      }
-      setSelectedTestId("");
-      
-      // Reload queue
-      loadData();
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Failed to upload result"));
     } finally {
@@ -96,123 +121,165 @@ export function LabResultsUpload() {
     }
   };
 
-  const processingTests = requests.filter(r => r.status === "PROCESSING");
-  const selectedTest = requests.find(r => r.id === Number(selectedTestId));
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20">
+        <span className="text-[#64748B] mb-4">Loading test parameters...</span>
+      </div>
+    );
+  }
+
+  if (!request) return null;
 
   return (
-    <div>
-      <PageHeader title="Results Upload" subtitle="Enter and upload laboratory test results" />
+    <div className="w-full pb-10">
+      <div className="flex items-center gap-4 mb-6">
+        <button 
+          onClick={() => navigate("/lab/test-requests")}
+          className="w-10 h-10 rounded-full border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-[#0F172A]">Enter Lab Results</h1>
+          <p className="text-sm text-[#64748B]">Input measured values against defined reference ranges</p>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Upload Form */}
-        <div className="xl:col-span-2 space-y-5">
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-6" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h3 className="font-semibold text-[#0F172A] mb-5 flex items-center gap-2">
-              <Upload size={18} className="text-[#0EA5E9]"/> Enter Test Results
-            </h3>
-
-            {/* Test Selector */}
-            <div className="mb-5">
-              <label className="block text-xs font-medium text-[#64748B] mb-1.5">Select In-Progress Test</label>
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-                <select
-                  value={selectedTestId}
-                  onChange={(e) => setSelectedTestId(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full h-11 pl-9 pr-4 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] bg-white appearance-none cursor-pointer"
-                >
-                  <option value="">— Select a test in PROCESSING status —</option>
-                  {processingTests.map((t) => (
-                    <option key={t.id} value={t.id}>LAB-{t.id} — {getPatientName(t.patientId)} — {t.testTypeName}</option>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* Left Column - Forms */}
+        <div className="md:col-span-2 space-y-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            <div className="px-6 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <h3 className="font-semibold text-[#0F172A] flex items-center gap-2">
+                <FlaskConical size={18} className="text-[#0EA5E9]" /> Result Data
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              {referenceRanges.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {/* Header Row */}
+                  <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 bg-[#F1F5F9] rounded-lg text-xs font-semibold text-[#64748B] uppercase tracking-wider">
+                    <div className="col-span-4">Component</div>
+                    <div className="col-span-3">Reference Range</div>
+                    <div className="col-span-2">Gender</div>
+                    <div className="col-span-3">Result Value</div>
+                  </div>
+                  {/* Data Rows */}
+                  {referenceRanges.map((range) => (
+                    <div key={range.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-3 rounded-lg border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] transition-colors">
+                      <div className="col-span-4 font-semibold text-[#0F172A] text-sm">
+                        {range.component}
+                      </div>
+                      <div className="col-span-3 text-xs text-[#64748B] font-mono">
+                        {range.minValue} - {range.maxValue} {range.unit}
+                      </div>
+                      <div className="col-span-2 text-xs text-[#64748B]">
+                        {range.gender ? (
+                          <span className="px-2 py-0.5 rounded bg-[#E2E8F0]">{range.gender}</span>
+                        ) : (
+                          <span className="text-[#94A3B8]">Any</span>
+                        )}
+                      </div>
+                      <div className="col-span-3 relative">
+                        <input 
+                          type="number"
+                          step="any"
+                          value={resultValues[range.component] || ""}
+                          onChange={(e) => handleComponentChange(range.component, e.target.value)}
+                          placeholder="Value"
+                          className="w-full h-9 px-3 pr-10 rounded-md border border-[#CBD5E1] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-white font-medium"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#94A3B8]">{range.unit}</span>
+                      </div>
+                    </div>
                   ))}
-                </select>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-[#64748B]">No structured reference ranges defined for this test type. Please enter unstructured result data.</p>
+                  <textarea
+                    rows={8}
+                    value={unstructuredData}
+                    onChange={(e) => setUnstructuredData(e.target.value)}
+                    placeholder="Enter result findings, values, or observations here..."
+                    className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Interpretation block moved to right column */}
+        </div>
+
+        {/* Right Column - Summary */}
+        <div className="space-y-6">
+          <div className="bg-[#1E3A5F] rounded-xl text-white p-6 shadow-lg">
+            <h3 className="font-bold mb-4 opacity-90 border-b border-white/10 pb-3">Request Summary</h3>
+            
+            <div className="space-y-4 text-sm">
+              <div>
+                <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Test Type</p>
+                <p className="font-semibold text-lg">{request.testTypeName}</p>
+              </div>
+              
+              <div>
+                <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Request ID</p>
+                <p className="font-mono">LAB-{request.id}</p>
+              </div>
+
+              <div>
+                <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Patient</p>
+                <p className="font-medium">{patientName}</p>
+              </div>
+              
+              <div>
+                <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Priority</p>
+                <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                  request.priority === "URGENT" || request.priority === "CRITICAL" ? "bg-red-500 text-white" : "bg-white/20 text-white"
+                }`}>
+                  {request.priority}
+                </span>
+              </div>
+              
+              <div>
+                <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Requested At</p>
+                <p>{new Date(request.requestedAt).toLocaleString()}</p>
               </div>
             </div>
+          </div>
 
-            {/* Patient Info (auto-fill) */}
-            {selectedTest && (
-              <div className="mb-5 p-4 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] grid grid-cols-1 md:grid-cols-3 gap-4 text-sm animate-fadeIn">
-                <div>
-                  <p className="text-xs text-[#64748B] uppercase tracking-wider font-semibold mb-1">Patient</p>
-                  <p className="font-medium text-[#0F172A]">{getPatientName(selectedTest.patientId)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#64748B] uppercase tracking-wider font-semibold mb-1">Test Type</p>
-                  <p className="font-medium text-[#0F172A]">{selectedTest.testTypeName}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#64748B] uppercase tracking-wider font-semibold mb-1">Priority</p>
-                  <p className={`font-bold ${selectedTest.priority === "URGENT" || selectedTest.priority === "CRITICAL" ? "text-red-500" : "text-[#0EA5E9]"}`}>
-                    {selectedTest.priority}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Result Data Text Area */}
-            <div className="mb-5">
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-2">Result Values / Data</label>
-              <textarea
-                value={resultData}
-                onChange={(e) => setResultData(e.target.value)}
-                rows={6}
-                placeholder="Enter result values, findings, or paste structured data here..."
-                className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9]"
-                disabled={!selectedTestId}
-              />
-            </div>
-
-            {/* Interpretation */}
-            <div className="mb-6">
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-2">Clinical Interpretation / Notes</label>
+          <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-sm flex flex-col">
+            <div className="p-6">
+              <label className="block text-sm font-semibold text-[#0F172A] mb-2">Clinical Interpretation & Notes</label>
               <textarea
                 value={interpretation}
                 onChange={(e) => setInterpretation(e.target.value)}
-                rows={3}
-                placeholder="Add technician notes, anomalies, or interpretation..."
-                className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9] resize-none"
-                disabled={!selectedTestId}
+                rows={4}
+                placeholder="Add technician notes, anomalies, or interpretation for the doctor..."
+                className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] resize-none"
               />
             </div>
-
-            {/* Actions */}
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || !selectedTestId || !resultData.trim()}
-              className="w-full h-11 rounded-lg bg-[#0EA5E9] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#0284C7] disabled:opacity-50 transition-colors"
-            >
-              {submitting ? (
-                <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-              ) : (
-                <><Upload size={16} /> Submit Result & Notify Doctor</>
-              )}
-            </button>
+            
+            <div className="px-6 py-4 bg-[#F8FAFC] border-t border-[#E2E8F0]">
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full h-11 rounded-lg bg-[#0EA5E9] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#0284C7] disabled:opacity-50 transition-colors"
+              >
+                {submitting ? (
+                  <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                ) : (
+                  <><CheckCircle size={16} /> Complete & Upload Results</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Recent Uploads */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] self-start" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-          <div className="px-5 py-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
-            <h3 className="font-semibold text-[#0F172A] flex items-center gap-2">
-              <CheckCircle size={16} className="text-[#10B981]" /> Recently Uploaded
-            </h3>
-          </div>
-          <div className="divide-y divide-[#F1F5F9]">
-            {recentlyUploaded.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[#64748B]">No results uploaded today.</div>
-            ) : (
-              recentlyUploaded.map((item, i) => (
-                <div key={i} className="p-4 hover:bg-[#F8FAFC]">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-[#0F172A]">{getPatientName(item.patientId)}</p>
-                    <span className="text-xs text-[#64748B]">LAB-{item.id}</span>
-                  </div>
-                  <p className="text-xs font-medium text-[#0EA5E9]">{item.testTypeName}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );

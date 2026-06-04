@@ -56,7 +56,6 @@ import { PatientProfilePage } from "./pages/patient/Profile";
 // Lab
 import { LabDashboard } from "./pages/lab/Dashboard";
 import { LabTestRequests } from "./pages/lab/TestRequests";
-import { LabTestProcessing } from "./pages/lab/TestProcessing";
 import { LabResultsUpload } from "./pages/lab/ResultsUpload";
 import { LabTestCatalog } from "./pages/lab/TestCatalog";
 import { LabEquipmentStatus } from "./pages/lab/EquipmentStatus";
@@ -116,8 +115,7 @@ export const router = createBrowserRouter([
       { path: "lab/dashboard", Component: LabDashboard },
       { path: "lab/test-catalog", Component: LabTestCatalog },
       { path: "lab/test-requests", Component: LabTestRequests },
-      { path: "lab/test-processing", Component: LabTestProcessing },
-      { path: "lab/results-upload", Component: LabResultsUpload },
+      { path: "lab/results-upload/:id", Component: LabResultsUpload },
       { path: "lab/equipment-status", Component: LabEquipmentStatus },
     ],
   },

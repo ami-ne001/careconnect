@@ -64,9 +64,7 @@ const navByRole: Record<string, NavItem[]> = {
   "Lab Technician": [
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/lab/dashboard" },
     { label: "Test Catalog", icon: <FlaskConical size={18} />, path: "/lab/test-catalog" },
-    { label: "Test Requests", icon: <TestTube size={18} />, path: "/lab/test-requests" },
-    { label: "Test Processing", icon: <Activity size={18} />, path: "/lab/test-processing" },
-    { label: "Results Upload", icon: <Upload size={18} />, path: "/lab/results-upload" },
+    { label: "Test Workflow", icon: <Activity size={18} />, path: "/lab/test-requests" },
     { label: "Equipment Status", icon: <Wrench size={18} />, path: "/lab/equipment-status" },
   ],
 };

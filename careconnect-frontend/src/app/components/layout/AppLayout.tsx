@@ -25,8 +25,7 @@ function Breadcrumb() {
     "medication-inventory": "Medication Inventory",
     "dispensing-history": "Dispensing History",
     "drug-interactions": "Drug Interactions",
-    "test-requests": "Test Requests", "test-processing": "Test Processing",
-    "results-upload": "Results Upload", "equipment-status": "Equipment Status",
+    "test-requests": "Test Workflow", "equipment-status": "Equipment Status",
   };
 
   return (
