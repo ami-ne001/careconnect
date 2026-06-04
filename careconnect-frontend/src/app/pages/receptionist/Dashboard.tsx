@@ -241,8 +241,8 @@ export function ReceptionistDashboard() {
                     {admissions.map((d) => (
                       <div key={d.id} className="flex items-center gap-3 px-5 py-3">
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-[#0F172A]">{d.patientName || "Inpatient"}</p>
-                          <p className="text-xs text-[#64748B]">Room {d.roomNumber || "—"} ({d.wardName || "—"})</p>
+                          <p className="text-sm font-medium text-[#0F172A]">Patient #{d.patientId}</p>
+                          <p className="text-xs text-[#64748B]">Room {d.room?.roomNumber || "—"} · Bed {d.bedNumber ?? "—"}</p>
                         </div>
                         <button onClick={() => navigate("/receptionist/admissions")} className="px-3 py-1.5 rounded-lg bg-[#F59E0B] text-white text-xs font-semibold hover:opacity-90 cursor-pointer">Manage</button>
                       </div>

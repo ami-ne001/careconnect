@@ -121,7 +121,7 @@ export function DoctorConsultations() {
         // Only show queue entries that belong to this doctor
         const myApptIds = new Set((appts || []).map((a) => a.id));
         const myQueue = (q || []).filter(
-          (qe) => myApptIds.has(qe.appointmentId) && qe.status !== "COMPLETED"
+          (qe) => myApptIds.has(qe.appointmentId) && qe.status !== "COMPLETED" && qe.status !== "DONE"
         );
         setQueue(myQueue);
         setAppointments(appts || []);

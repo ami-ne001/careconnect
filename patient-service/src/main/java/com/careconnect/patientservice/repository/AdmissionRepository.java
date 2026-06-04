@@ -11,4 +11,5 @@ import java.util.List;
 public interface AdmissionRepository extends JpaRepository<Admission, Long> {
     List<Admission> findByPatientId(Long patientId);
     List<Admission> findByStatus(AdmissionStatus status);
+    long countByRoomIdAndStatus(Long roomId, AdmissionStatus status);
 }
