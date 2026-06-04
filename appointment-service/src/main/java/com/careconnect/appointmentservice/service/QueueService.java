@@ -32,8 +32,8 @@ public class QueueService {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id: " + appointmentId));
 
-        if (appointment.getStatus() != AppointmentStatus.SCHEDULED && appointment.getStatus() != AppointmentStatus.CONFIRMED) {
-            throw new BadRequestException("Appointment must be in SCHEDULED or CONFIRMED status to check in");
+        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
+            throw new BadRequestException("Appointment must be in SCHEDULED status to check in");
         }
 
         if (queueRepository.findByAppointmentId(appointmentId).isPresent()) {

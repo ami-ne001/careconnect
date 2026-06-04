@@ -151,9 +151,9 @@ export function PatientAppointments() {
     return `${doc.firstName[0] || ""}${doc.lastName[0] || ""}`.toUpperCase();
   };
 
-  // Split appointments into tabs
+  // Filter appointments
   const upcoming = appointments.filter((a) =>
-    ["SCHEDULED", "CONFIRMED", "CHECKED_IN", "IN_PROGRESS"].includes(a.status)
+    ["SCHEDULED", "PENDING_APPROVAL", "CHECKED_IN", "IN_PROGRESS"].includes(a.status)
   );
   
   const past = appointments.filter((a) =>
@@ -220,9 +220,7 @@ export function PatientAppointments() {
               return (
                 <div
                   key={a.id}
-                  className={`bg-white rounded-xl border-2 p-5 ${
-                    a.status === "CONFIRMED" || a.status === "IN_PROGRESS" ? "border-[#0EA5E9]" : "border-[#E2E8F0]"
-                  }`}
+                  className={`bg-white rounded-xl border-2 p-5 border-[#E2E8F0]`}
                   style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -235,8 +233,14 @@ export function PatientAppointments() {
                         <p className="text-xs text-[#64748B]">{a.room || "General Practice"}</p>
                       </div>
                     </div>
-                    <Badge variant={a.status === "CONFIRMED" || a.status === "IN_PROGRESS" ? "active" : "pending"}>
-                      {a.status.replace("_", " ")}
+                    <Badge
+                      variant={
+                        a.status === "SCHEDULED" || a.status === "IN_PROGRESS" ? "active"
+                        : a.status === "PENDING_APPROVAL" ? "pending"
+                        : "completed"
+                      }
+                    >
+                      {a.status.replace(/_/g, " ")}
                     </Badge>
                   </div>
                   <div className="space-y-2 mb-4">
@@ -254,12 +258,18 @@ export function PatientAppointments() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleCancel(a.id)}
-                      className="flex-1 h-9 rounded-xl bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 cursor-pointer transition-colors"
-                    >
-                      Cancel Appointment
-                    </button>
+                    {a.status === "PENDING_APPROVAL" ? (
+                      <div className="flex-1 flex items-center gap-2 h-9 px-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+                        ⏳ Awaiting receptionist approval
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleCancel(a.id)}
+                        className="flex-1 h-9 rounded-xl bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 cursor-pointer transition-colors"
+                      >
+                        Cancel Appointment
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -482,6 +492,10 @@ export function PatientAppointments() {
                         className="w-full h-20 p-3 rounded-lg border border-[#E2E8F0] text-xs focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] resize-none"
                       />
                     </div>
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                      <span className="mt-0.5">⏳</span>
+                      <p>Your request will be sent to the receptionist for approval. You'll see it as <strong>Pending Approval</strong> until confirmed.</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -497,9 +511,9 @@ export function PatientAppointments() {
                 {step === 4 && (
                   <button
                     onClick={handleBook}
-                    className="flex-1 h-10 rounded-lg bg-[#10B981] text-white text-xs font-bold hover:bg-[#059669] cursor-pointer transition-colors"
+                    className="flex-1 h-10 rounded-lg bg-[#1E3A5F] text-white text-xs font-bold hover:opacity-90 cursor-pointer transition-colors"
                   >
-                    ✓ Confirm Booking
+                    Send Request
                   </button>
                 )}
               </div>

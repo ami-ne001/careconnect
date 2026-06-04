@@ -201,7 +201,7 @@ export function DoctorAppointments() {
                     const dt = new Date(a.scheduledAt);
                     const isToday = dt.toDateString() === new Date().toDateString();
                     const canStart =
-                      isToday && ["CHECKED_IN", "SCHEDULED", "CONFIRMED"].includes(a.status);
+                      isToday && ["CHECKED_IN", "SCHEDULED"].includes(a.status);
                     const canComplete = a.status === "IN_PROGRESS";
                     const isUpdating = updatingId === a.id;
 

@@ -37,9 +37,11 @@ public class AppointmentService {
     private final EventPublisher eventPublisher;
 
     @Transactional
-    public AppointmentResponse createAppointment(AppointmentCreateRequest request, Long createdByUserId) {
+    public AppointmentResponse createAppointment(AppointmentCreateRequest request, Long createdByUserId, boolean isPatient) {
         validateDoctorAvailability(request.getDoctorId(), request.getScheduledAt(), request.getDurationMinutes());
         validateConflicts(null, request.getDoctorId(), request.getScheduledAt(), request.getDurationMinutes());
+
+        AppointmentStatus initialStatus = isPatient ? AppointmentStatus.PENDING_APPROVAL : AppointmentStatus.SCHEDULED;
 
         Appointment appointment = Appointment.builder()
                 .patientId(request.getPatientId())
@@ -49,12 +51,12 @@ public class AppointmentService {
                 .type(request.getType())
                 .room(request.getRoom())
                 .notes(request.getNotes())
-                .status(AppointmentStatus.SCHEDULED)
+                .status(initialStatus)
                 .createdBy(createdByUserId)
                 .build();
 
         Appointment saved = appointmentRepository.save(appointment);
-        if (saved.getStatus() == AppointmentStatus.CONFIRMED) {
+        if (saved.getStatus() == AppointmentStatus.SCHEDULED) {
             publishConfirmedEvent(saved);
         }
 
@@ -102,7 +104,7 @@ public class AppointmentService {
         appointment.setStatus(newStatus);
         Appointment saved = appointmentRepository.save(appointment);
 
-        if (newStatus == AppointmentStatus.CONFIRMED && oldStatus != AppointmentStatus.CONFIRMED) {
+        if (newStatus == AppointmentStatus.SCHEDULED && oldStatus != AppointmentStatus.SCHEDULED) {
             publishConfirmedEvent(saved);
         }
 

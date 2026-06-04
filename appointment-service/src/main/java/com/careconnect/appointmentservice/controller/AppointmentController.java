@@ -31,8 +31,10 @@ public class AppointmentController {
     public ResponseEntity<AppointmentResponse> createAppointment(@Valid @RequestBody AppointmentCreateRequest request,
                                                                  Authentication authentication) {
         Long createdByUserId = Long.valueOf(authentication.getName());
+        boolean isPatient = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_PATIENT"));
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(appointmentService.createAppointment(request, createdByUserId));
+                .body(appointmentService.createAppointment(request, createdByUserId, isPatient));
     }
 
     @GetMapping

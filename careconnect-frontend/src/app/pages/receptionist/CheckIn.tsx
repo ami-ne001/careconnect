@@ -53,7 +53,7 @@ export function CheckIn() {
 
           const todayStr = new Date().toDateString();
           const todayScheduled = allAppts.filter(
-              (a) => new Date(a.scheduledAt).toDateString() === todayStr && ["SCHEDULED", "CONFIRMED"].includes(a.status)
+              (a) => new Date(a.scheduledAt).toDateString() === todayStr && a.status === "SCHEDULED"
           );
           setAppointments(todayScheduled);
         })
@@ -152,7 +152,9 @@ export function CheckIn() {
                                 {alreadyCheckedIn ? (
                                     <Badge variant="completed" dot>Checked In</Badge>
                                 ) : (
-                                    <Badge variant={appt.status === "CONFIRMED" ? "active" : "pending"} dot>{appt.status}</Badge>
+                                    <div>
+                                        <Badge variant={appt.status === "SCHEDULED" ? "active" : "pending"} dot>{appt.status}</Badge>
+                                    </div>
                                 )}
                               </div>
                               <div className="flex items-center justify-between text-xs text-[#64748B] mb-3">
