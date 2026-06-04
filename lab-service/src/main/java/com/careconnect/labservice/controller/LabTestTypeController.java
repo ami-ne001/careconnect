@@ -21,7 +21,7 @@ public class LabTestTypeController {
     private final LabTestTypeService testTypeService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN')")
     public ResponseEntity<LabTestTypeResponse> createTestType(@Valid @RequestBody LabTestTypeCreateRequest request) {
         return ResponseEntity.ok(testTypeService.createTestType(request));
     }
@@ -36,15 +36,21 @@ public class LabTestTypeController {
         return ResponseEntity.ok(testTypeService.getTestTypeById(id));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN')")
+    public ResponseEntity<LabTestTypeResponse> updateTestType(@PathVariable Long id, @Valid @RequestBody LabTestTypeCreateRequest request) {
+        return ResponseEntity.ok(testTypeService.updateTestType(id, request));
+    }
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN')")
     public ResponseEntity<Void> deleteTestType(@PathVariable Long id) {
         testTypeService.deleteTestType(id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/reference-ranges")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN')")
     public ResponseEntity<ReferenceRangeResponse> addReferenceRange(@PathVariable Long id, @Valid @RequestBody ReferenceRangeCreateRequest request) {
         // Ensure the path variable matches the request body
         if (!id.equals(request.getTestTypeId())) {

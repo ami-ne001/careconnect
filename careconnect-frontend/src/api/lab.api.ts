@@ -121,6 +121,9 @@ export const labApi = {
   createTestType: (body: LabTestTypeCreateRequest) =>
     api.post<LabTestTypeResponse>("/api/lab/test-types", body),
 
+  updateTestType: (id: number, body: LabTestTypeCreateRequest) =>
+    api.put<LabTestTypeResponse>(`/api/lab/test-types/${id}`, body),
+
   getReferenceRanges: (testTypeId: number) =>
     api.get<ReferenceRangeResponse[]>(`/api/lab/test-types/${testTypeId}/reference-ranges`),
     

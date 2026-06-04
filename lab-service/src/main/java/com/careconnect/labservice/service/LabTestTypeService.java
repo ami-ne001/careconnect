@@ -50,6 +50,24 @@ public class LabTestTypeService {
         return mapToResponse(testType);
     }
 
+    @Transactional
+    public LabTestTypeResponse updateTestType(Long id, LabTestTypeCreateRequest request) {
+        LabTestType testType = testTypeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Test type not found with ID: " + id));
+        
+        // Check if name is changed and if new name already exists
+        if (!testType.getName().equals(request.getName()) && testTypeRepository.findByName(request.getName()).isPresent()) {
+            throw new BadRequestException("Test type with name '" + request.getName() + "' already exists");
+        }
+
+        testType.setName(request.getName());
+        testType.setCategory(request.getCategory());
+        testType.setSampleType(request.getSampleType());
+        testType.setDescription(request.getDescription());
+
+        return mapToResponse(testTypeRepository.save(testType));
+    }
+
     @Transactional(readOnly = true)
     public List<LabTestTypeResponse> getAllTestTypes() {
         return testTypeRepository.findAll().stream()
