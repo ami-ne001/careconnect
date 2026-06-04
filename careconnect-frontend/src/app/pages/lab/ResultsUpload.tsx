@@ -12,14 +12,14 @@ export function LabResultsUpload() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { userId } = useAuth();
-  
+
   const [request, setRequest] = useState<LabRequestResponse | null>(null);
   const [patientName, setPatientName] = useState("");
   const [referenceRanges, setReferenceRanges] = useState<ReferenceRangeResponse[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Form State
   const [resultValues, setResultValues] = useState<Record<string, string>>({});
   const [unstructuredData, setUnstructuredData] = useState("");
@@ -34,17 +34,17 @@ export function LabResultsUpload() {
   const loadData = async (reqId: number) => {
     try {
       setLoading(true);
-      
+
       // 1. Fetch Request
       const reqRes = await labApi.getAllLabRequests(); // (or get by id if we implement it)
       const req = reqRes.data.find(r => r.id === reqId);
-      
+
       if (!req) {
         toast.error("Lab request not found.");
         navigate("/lab/test-requests");
         return;
       }
-      
+
       setRequest(req);
 
       // 2. Fetch Patient Name
@@ -58,14 +58,14 @@ export function LabResultsUpload() {
       // 3. Fetch Reference Ranges
       const rangeRes = await labApi.getReferenceRanges(req.testTypeId);
       setReferenceRanges(rangeRes.data);
-      
+
       // Initialize results object
       const initialVals: Record<string, string> = {};
       rangeRes.data.forEach(r => {
         initialVals[r.component] = "";
       });
       setResultValues(initialVals);
-      
+
     } catch (error) {
       console.error("Failed to load upload data", error);
       toast.error("Failed to load test details");
@@ -87,7 +87,7 @@ export function LabResultsUpload() {
       toast.error("Please fill in all reference range fields.");
       return;
     }
-    
+
     if (referenceRanges.length === 0 && !unstructuredData.trim()) {
       toast.error("Please provide result data.");
       return;
@@ -95,7 +95,7 @@ export function LabResultsUpload() {
 
     try {
       setSubmitting(true);
-      
+
       // Construct final result data
       let finalData = "";
       if (referenceRanges.length > 0) {
@@ -110,10 +110,10 @@ export function LabResultsUpload() {
         resultData: finalData,
         interpretation
       });
-      
+
       toast.success("Results uploaded successfully and doctor notified.");
       navigate("/lab/test-requests");
-      
+
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Failed to upload result"));
     } finally {
@@ -134,7 +134,7 @@ export function LabResultsUpload() {
   return (
     <div className="w-full pb-10">
       <div className="flex items-center gap-4 mb-6">
-        <button 
+        <button
           onClick={() => navigate("/lab/test-requests")}
           className="w-10 h-10 rounded-full border border-[#E2E8F0] flex items-center justify-center text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
         >
@@ -147,7 +147,7 @@ export function LabResultsUpload() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
+
         {/* Left Column - Forms */}
         <div className="md:col-span-2 space-y-6">
           <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
@@ -156,7 +156,7 @@ export function LabResultsUpload() {
                 <FlaskConical size={18} className="text-[#0EA5E9]" /> Result Data
               </h3>
             </div>
-            
+
             <div className="p-6">
               {referenceRanges.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3">
@@ -184,7 +184,7 @@ export function LabResultsUpload() {
                         )}
                       </div>
                       <div className="col-span-3 relative">
-                        <input 
+                        <input
                           type="number"
                           step="any"
                           value={resultValues[range.component] || ""}
@@ -219,13 +219,13 @@ export function LabResultsUpload() {
         <div className="space-y-6">
           <div className="bg-[#1E3A5F] rounded-xl text-white p-6 shadow-lg">
             <h3 className="font-bold mb-4 opacity-90 border-b border-white/10 pb-3">Request Summary</h3>
-            
+
             <div className="space-y-4 text-sm">
               <div>
                 <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Test Type</p>
                 <p className="font-semibold text-lg">{request.testTypeName}</p>
               </div>
-              
+
               <div>
                 <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Request ID</p>
                 <p className="font-mono">LAB-{request.id}</p>
@@ -235,16 +235,15 @@ export function LabResultsUpload() {
                 <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Patient</p>
                 <p className="font-medium">{patientName}</p>
               </div>
-              
+
               <div>
                 <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Priority</p>
-                <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${
-                  request.priority === "URGENT" || request.priority === "CRITICAL" ? "bg-red-500 text-white" : "bg-white/20 text-white"
-                }`}>
+                <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${request.priority === "URGENT" || request.priority === "CRITICAL" ? "bg-red-500 text-white" : "bg-white/20 text-white"
+                  }`}>
                   {request.priority}
                 </span>
               </div>
-              
+
               <div>
                 <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Requested At</p>
                 <p>{new Date(request.requestedAt).toLocaleString()}</p>
@@ -263,7 +262,7 @@ export function LabResultsUpload() {
                 className="w-full px-4 py-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] resize-none"
               />
             </div>
-            
+
             <div className="px-6 py-4 bg-[#F8FAFC] border-t border-[#E2E8F0]">
               <button
                 onClick={handleSubmit}

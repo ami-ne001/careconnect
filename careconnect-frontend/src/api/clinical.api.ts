@@ -110,7 +110,7 @@ export interface PrescriptionResponse {
   patientId: number;
   doctorId: number;
   consultationId?: number;
-  prescribedDate: string;
+  issuedAt: string;
   status: string;
   notes?: string;
   items: PrescriptionItemDto[];

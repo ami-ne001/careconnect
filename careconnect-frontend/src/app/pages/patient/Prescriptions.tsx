@@ -54,7 +54,7 @@ export function PatientPrescriptions() {
             ) : (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 {active.map((p) => {
-                  const dt = new Date(p.prescribedDate);
+                  const dt = new Date(p.issuedAt);
                   const formattedDate = dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
                   return (
@@ -124,7 +124,7 @@ export function PatientPrescriptions() {
                     </thead>
                     <tbody>
                       {history.map((h, i) => {
-                        const dt = new Date(h.prescribedDate);
+                        const dt = new Date(h.issuedAt);
                         const formattedDate = dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                         const medsSummary = h.items.map(item => `${item.medication} (${item.dosage})`).join(", ");
 
