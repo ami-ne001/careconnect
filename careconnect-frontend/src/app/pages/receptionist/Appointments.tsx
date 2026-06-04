@@ -146,6 +146,31 @@ export function ReceptionistAppointments() {
     }
   };
 
+  const handleApprove = async (id: number) => {
+    try {
+      await appointmentApi.updateAppointmentStatus(id, "SCHEDULED");
+      toast.success("Appointment approved and scheduled.");
+      loadData();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to approve appointment."));
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    if (!window.confirm("Reject this appointment request?")) return;
+    try {
+      await appointmentApi.cancelAppointment(id);
+      toast.success("Appointment request rejected.");
+      loadData();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to reject appointment."));
+    }
+  };
+
+  const formatStatus = (status: string) => {
+    return status.replace(/_/g, " ");
+  };
+
   // Filtered Appointments
   const filteredAppointments = appointments.filter((a) => {
     if (selectedDoctorFilter === "All") return true;
@@ -238,19 +263,42 @@ export function ReceptionistAppointments() {
                           <td className="px-5 py-3.5 text-[#64748B]">{a.room || "—"}</td>
                           <td className="px-5 py-3.5 text-[#64748B]">{a.type.replace("_", " ")}</td>
                           <td className="px-5 py-3.5">
-                            <Badge variant={a.status === "COMPLETED" ? "completed" : a.status === "CANCELLED" ? "inactive" : "active"} dot>
-                              {a.status}
+                            <Badge
+                              variant={
+                                a.status === "COMPLETED" ? "completed"
+                                : a.status === "CANCELLED" ? "inactive"
+                                : a.status === "PENDING_APPROVAL" ? "pending"
+                                : "active"
+                              }
+                              dot
+                            >
+                              {formatStatus(a.status)}
                             </Badge>
                           </td>
                           <td className="px-5 py-3.5">
-                            {a.status !== "CANCELLED" && a.status !== "COMPLETED" && (
+                            {a.status === "PENDING_APPROVAL" ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleApprove(a.id)}
+                                  className="px-3 py-1.5 rounded-lg bg-[#10B981] text-white text-xs font-semibold hover:bg-[#059669] cursor-pointer transition-colors"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleReject(a.id)}
+                                  className="px-3 py-1.5 rounded-lg border border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50 cursor-pointer transition-colors"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : a.status !== "CANCELLED" && a.status !== "COMPLETED" ? (
                               <button
                                 onClick={() => handleCancel(a.id)}
                                 className="px-3 py-1.5 rounded-lg border border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50 cursor-pointer transition-colors"
                               >
                                 Cancel
                               </button>
-                            )}
+                            ) : null}
                           </td>
                         </tr>
                       );

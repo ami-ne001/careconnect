@@ -124,27 +124,13 @@ export function PatientBilling() {
 
           {/* Outstanding Alert */}
           {outstanding > 0 && (
-            <div className="mb-5 flex items-center justify-between p-4 rounded-xl bg-[#FFFBEB] border border-[#FDE68A]">
+            <div className="mb-5 flex items-center p-4 rounded-xl bg-[#FFFBEB] border border-[#FDE68A]">
               <div className="flex items-center gap-3">
                 <Clock size={18} className="text-[#F59E0B]" />
                 <p className="text-sm text-[#92400E]">
-                  You have <strong>${outstanding.toLocaleString()}</strong> in outstanding payments. Please settle your dues.
+                  You have <strong>${outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> in outstanding payments. Please settle your dues below.
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  const firstPending = invoices.find(i => i.status === "PENDING" || i.status === "PARTIALLY_PAID");
-                  if (firstPending) {
-                    setSelectedInvoice(firstPending);
-                    setPayModal(true);
-                  } else {
-                    toast.info("No single invoice found to pay.");
-                  }
-                }}
-                className="px-4 py-2 rounded-lg bg-[#F59E0B] text-white text-sm font-medium hover:bg-[#D97706] cursor-pointer transition-colors"
-              >
-                Pay Outstanding
-              </button>
             </div>
           )}
 
@@ -192,24 +178,26 @@ export function PatientBilling() {
                             </Badge>
                           </td>
                           <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setViewInvoice(inv)}
-                                className="text-[#64748B] text-xs font-semibold hover:text-[#0EA5E9] cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-[#F8FAFC] text-[#475569] text-xs font-semibold hover:bg-[#E2E8F0] hover:text-[#0F172A] transition-colors cursor-pointer border border-[#E2E8F0]"
                               >
                                 View Details
                               </button>
                               {inv.status === "PAID" ? (
-                                <span className="text-[#10B981] text-xs font-semibold">✓ Completed</span>
+                                <span className="flex items-center gap-1.5 px-3 py-1.5 bg-[#ECFDF5] text-[#10B981] rounded-lg text-xs font-bold border border-[#A7F3D0]">
+                                  <CheckCircle size={14} /> Completed
+                                </span>
                               ) : (
                                 <button
                                   onClick={() => {
                                     setSelectedInvoice(inv);
                                     setPayModal(true);
                                   }}
-                                  className="flex items-center gap-1 text-[#0EA5E9] text-xs font-semibold hover:underline cursor-pointer"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0EA5E9] text-white text-xs font-semibold hover:bg-[#0284C7] transition-all shadow-sm cursor-pointer"
                                 >
-                                  <CreditCard size={12} />
+                                  <CreditCard size={14} />
                                   Pay Now
                                 </button>
                               )}
@@ -291,26 +279,41 @@ export function PatientBilling() {
                   </div>
                 </div>
                 {payMethod === "CARD" && (
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      placeholder="Card Number"
-                      defaultValue="**** **** **** 4821"
-                      className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9]"
-                    />
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <CreditCard size={16} className="text-[#94A3B8]" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Card Number"
+                        defaultValue="**** **** **** 4821"
+                        className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/20 focus:border-[#0EA5E9] transition-all shadow-sm bg-white"
+                      />
+                    </div>
                     <div className="flex gap-3">
-                      <input
-                        type="text"
-                        placeholder="MM/YY"
-                        defaultValue="08/27"
-                        className="flex-1 h-11 px-4 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9]"
-                      />
-                      <input
-                        type="text"
-                        placeholder="CVV"
-                        defaultValue="•••"
-                        className="flex-1 h-11 px-4 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30 focus:border-[#0EA5E9]"
-                      />
+                      <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                          <Clock size={16} className="text-[#94A3B8]" />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="MM/YY"
+                          defaultValue="08/27"
+                          className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/20 focus:border-[#0EA5E9] transition-all shadow-sm bg-white"
+                        />
+                      </div>
+                      <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                          <span className="text-[#94A3B8] font-bold text-[10px] uppercase">CVV</span>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="123"
+                          defaultValue="•••"
+                          className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/20 focus:border-[#0EA5E9] transition-all shadow-sm bg-white"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
