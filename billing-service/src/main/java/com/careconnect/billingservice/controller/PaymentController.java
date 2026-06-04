@@ -23,7 +23,7 @@ public class PaymentController {
     private final JwtUtil jwtUtil;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'PATIENT')")
     public ResponseEntity<PaymentResponse> recordPayment(
             @Valid @RequestBody PaymentCreateRequest request,
             HttpServletRequest httpRequest) {

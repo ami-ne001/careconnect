@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
-import { clinicalApi, patientApi } from "@/api";
+import { clinicalApi, patientApi, adminApi } from "@/api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -10,10 +10,22 @@ import type { PrescriptionResponse } from "@/api/clinical.api";
 export function PatientPrescriptions() {
   const { userId } = useAuth();
   const [prescriptions, setPrescriptions] = useState<PrescriptionResponse[]>([]);
+  const [doctors, setDoctors] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!userId) return;
+
+    // Fetch doctors mapping
+    adminApi.getUsers("DOCTOR")
+      .then(({ data }) => {
+        const docMap: Record<number, string> = {};
+        data.forEach(d => {
+          docMap[d.id] = `Dr. ${d.firstName} ${d.lastName}`;
+        });
+        setDoctors(docMap);
+      })
+      .catch(console.error);
 
     patientApi.getProfileByUserId(userId)
       .then(({ data: patProfile }) => {
@@ -68,7 +80,7 @@ export function PatientPrescriptions() {
                           <div className="w-12 h-12 rounded-xl bg-[#EFF6FF] flex items-center justify-center text-2xl">💊</div>
                           <div>
                             <h4 className="font-bold text-[#0F172A] text-sm">Order #{p.id}</h4>
-                            <p className="text-xs text-[#64748B]">Prescribed by Dr. #{p.doctorId}</p>
+                            <p className="text-xs text-[#64748B]">Prescribed by {doctors[p.doctorId] || `Dr. #${p.doctorId}`}</p>
                           </div>
                         </div>
                         <Badge variant="active" dot>Active</Badge>
@@ -131,7 +143,7 @@ export function PatientPrescriptions() {
                         return (
                           <tr key={h.id} className={`border-b border-[#F1F5F9] hover:bg-[#FAFBFC] ${i % 2 === 1 ? "bg-[#FAFBFC]" : ""}`}>
                             <td className="px-5 py-3.5 font-semibold text-[#0EA5E9]">#{h.id}</td>
-                            <td className="px-5 py-3.5 text-[#64748B]">Dr. #{h.doctorId}</td>
+                            <td className="px-5 py-3.5 text-[#64748B]">{doctors[h.doctorId] || `Dr. #${h.doctorId}`}</td>
                             <td className="px-5 py-3.5 text-[#64748B]">{formattedDate}</td>
                             <td className="px-5 py-3.5 text-[#0F172A] max-w-xs truncate" title={medsSummary}>
                               {medsSummary || "—"}
