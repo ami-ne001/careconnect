@@ -50,6 +50,15 @@ export interface PaymentResponse {
   receivedBy?: number;
 }
 
+export interface MonthlyRevenuePoint {
+  month: string;
+  revenue: number;
+}
+
+export interface MonthlyRevenueReport {
+  points: MonthlyRevenuePoint[];
+}
+
 export const billingApi = {
   createInvoice: (body: InvoiceCreateRequest) =>
     api.post<InvoiceResponse>("/api/billing/invoices", body),
@@ -74,4 +83,9 @@ export const billingApi = {
 
   getPaymentsForInvoice: (invoiceId: number) =>
     api.get<PaymentResponse[]>(`/api/billing/payments/invoice/${invoiceId}`),
+
+  getMonthlyRevenueReport: (months = 6) =>
+    api.get<MonthlyRevenueReport>("/api/billing/reports/monthly-revenue", {
+      params: { months },
+    }),
 };

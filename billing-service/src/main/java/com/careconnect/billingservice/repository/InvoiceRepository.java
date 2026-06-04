@@ -5,6 +5,8 @@ import com.careconnect.billingservice.enums.InvoiceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +18,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     Optional<Invoice> findBySurgeryId(Long surgeryId);
     List<Invoice> findByStatus(InvoiceStatus status);
     List<Invoice> findByPatientIdAndStatus(Long patientId, InvoiceStatus status);
+
+    List<Invoice> findByStatusInAndIssuedAtGreaterThanEqualAndIssuedAtLessThan(
+            Collection<InvoiceStatus> statuses,
+            LocalDateTime issuedAtStart,
+            LocalDateTime issuedAtEnd);
 }

@@ -9,13 +9,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserSummaryResponse {
+public class StaffDepartmentMetricResponse {
 
-    private Long id;
-    private String firstName;
-    private String lastName;
-    private String email;
-    private String role;
-    private Long departmentId;
     private String departmentName;
+    private long activeCount;
+    private long totalCount;
+    private int activeRate;
 }
