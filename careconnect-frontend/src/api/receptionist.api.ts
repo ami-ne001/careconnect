@@ -11,8 +11,9 @@ export interface WardResponse {
 export interface RoomResponse {
   id: number;
   roomNumber: string;
-  type: string;
+  bedCount: number;
   status: string;
+  notes?: string;
   wardId: number;
   wardName?: string;
 }
@@ -61,6 +62,8 @@ export const receptionistApi = {
   // Rooms
   getRooms: () => api.get<RoomResponse[]>("/api/rooms"),
   getAvailableRooms: () => api.get<RoomResponse[]>("/api/rooms/available"),
+  updateRoomStatus: (id: number, status: string) => 
+    api.put<RoomResponse>(`/api/rooms/${id}/status?status=${status}`, {}),
 
   // Admissions
   admitPatient: (body: AdmissionCreateRequest) =>
