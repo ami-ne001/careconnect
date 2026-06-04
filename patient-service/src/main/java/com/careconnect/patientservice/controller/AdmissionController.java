@@ -3,7 +3,9 @@ package com.careconnect.patientservice.controller;
 import com.careconnect.patientservice.dto.AdmissionCreateRequest;
 import com.careconnect.patientservice.dto.AdmissionResponse;
 import com.careconnect.patientservice.dto.AdmissionUpdateRequest;
+import com.careconnect.patientservice.dto.AdmissionsByDepartmentResponse;
 import com.careconnect.patientservice.dto.DischargeRequest;
+import com.careconnect.patientservice.service.AdmissionAnalyticsService;
 import com.careconnect.patientservice.service.AdmissionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +13,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 @RestController
@@ -21,6 +26,7 @@ import java.util.List;
 public class AdmissionController {
 
     private final AdmissionService admissionService;
+    private final AdmissionAnalyticsService admissionAnalyticsService;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
@@ -53,6 +59,17 @@ public class AdmissionController {
     @PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'NURSE')")
     public ResponseEntity<List<AdmissionResponse>> getActiveAdmissions() {
         return ResponseEntity.ok(admissionService.getActiveAdmissions());
+    }
+
+    @GetMapping("/analytics/by-department")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdmissionsByDepartmentResponse> getAdmissionsByDepartment(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        YearMonth current = YearMonth.now();
+        LocalDate start = startDate != null ? startDate : current.atDay(1);
+        LocalDate end = endDate != null ? endDate : current.atEndOfMonth();
+        return ResponseEntity.ok(admissionAnalyticsService.getAdmissionsByDepartment(start, end));
     }
 
     @PutMapping("/{id}")

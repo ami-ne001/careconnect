@@ -46,6 +46,18 @@ export interface AdmissionResponse {
   followUpInstructions?: string;
 }
 
+export interface DepartmentAdmissionSlice {
+  departmentName: string;
+  count: number;
+}
+
+export interface AdmissionsByDepartmentReport {
+  startDate: string;
+  endDate: string;
+  totalAdmissions: number;
+  slices: DepartmentAdmissionSlice[];
+}
+
 export interface DischargeRequest {
   dischargeStatus: "RECOVERED" | "AGAINST_MEDICAL_ADVICE" | "TRANSFERRED" | "DECEASED";
   conditionOnDischarge: "STABLE" | "IMPROVED" | "UNCHANGED" | "CRITICAL";
@@ -78,6 +90,9 @@ export const receptionistApi = {
     api.post<AdmissionResponse>("/api/admissions", body),
 
   getActiveAdmissions: () => api.get<AdmissionResponse[]>("/api/admissions/active"),
+
+  getAdmissionsByDepartment: (params?: { startDate?: string; endDate?: string }) =>
+    api.get<AdmissionsByDepartmentReport>("/api/admissions/analytics/by-department", { params }),
 
   dischargePatient: (id: number, body: DischargeRequest) =>
     api.post<AdmissionResponse>(`/api/admissions/${id}/discharge`, body),

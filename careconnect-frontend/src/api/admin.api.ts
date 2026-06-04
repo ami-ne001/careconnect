@@ -31,4 +31,18 @@ export const adminApi = {
     api.put<Department>(`/api/admin/departments/${id}`, body),
 
   deleteDepartment: (id: number) => api.delete(`/api/admin/departments/${id}`),
+
+  getStaffByDepartmentReport: () =>
+    api.get<StaffByDepartmentReport>('/api/admin/reports/staff-by-department'),
 };
+
+export interface StaffDepartmentMetric {
+  departmentName: string;
+  activeCount: number;
+  totalCount: number;
+  activeRate: number;
+}
+
+export interface StaffByDepartmentReport {
+  departments: StaffDepartmentMetric[];
+}

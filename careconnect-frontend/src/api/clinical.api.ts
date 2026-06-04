@@ -33,6 +33,73 @@ export interface AuditLogPageResponse {
   size: number;
 }
 
+// ── Operating rooms ───────────────────────────────────────────────
+export interface OperatingRoomStatsResponse {
+  total: number;
+  inUse: number;
+  available: number;
+  cleaning: number;
+}
+
+export interface OperatingRoomSurgerySummaryResponse {
+  surgeryId: number;
+  surgeryType: string;
+  patientName: string;
+  surgeonName: string;
+  scheduledAt: string;
+  actualStartAt?: string | null;
+  actualEndAt?: string | null;
+  estimatedEndAt?: string | null;
+  progressPercent?: number | null;
+}
+
+export interface OperatingRoomCardResponse {
+  id: number;
+  name: string;
+  status: string;
+  uiStatus: string;
+  lastSurgery?: OperatingRoomSurgerySummaryResponse | null;
+  nextSurgery?: OperatingRoomSurgerySummaryResponse | null;
+  upcoming: OperatingRoomSurgerySummaryResponse[];
+  current?: OperatingRoomSurgerySummaryResponse | null;
+  estReady?: string | null;
+}
+
+export interface WeekScheduleBlockResponse {
+  dayIndex: number;
+  startHour: number;
+  spanHours: number;
+  label: string;
+  orName: string;
+  colorKey: string;
+}
+
+export interface WeekScheduleRowResponse {
+  orName: string;
+  blocks: WeekScheduleBlockResponse[];
+}
+
+export interface WeekScheduleResponse {
+  weekStart: string;
+  weekEnd: string;
+  dayLabels: string[];
+  rows: WeekScheduleRowResponse[];
+}
+
+export interface OperatingRoomOverviewResponse {
+  stats: OperatingRoomStatsResponse;
+  rooms: OperatingRoomCardResponse[];
+  weekSchedule: WeekScheduleResponse;
+}
+
+export interface OperatingRoomResponse {
+  id: number;
+  name: string;
+  status: string;
+  lastUsedAt?: string | null;
+  notes?: string | null;
+}
+
 // ── Consultation ──────────────────────────────────────────────────
 export interface ConsultationResponse {
   id: number;
@@ -188,4 +255,19 @@ export const clinicalApi = {
 
   getScheduledSurgeriesThisMonth: () =>
     api.get<number>("/api/clinical/surgeries/metrics/scheduled-this-month"),
+
+  // Operating rooms
+  getOperatingRoomsOverview: (weekStart?: string) =>
+    api.get<OperatingRoomOverviewResponse>("/api/clinical/operating-rooms/overview", {
+      params: weekStart ? { weekStart } : undefined,
+    }),
+
+  getOperatingRooms: () =>
+    api.get<OperatingRoomResponse[]>("/api/clinical/operating-rooms"),
+
+  updateOperatingRoomStatus: (id: number, status: string, notes?: string) =>
+    api.put<OperatingRoomResponse>(`/api/clinical/operating-rooms/${id}/status`, {
+      status,
+      notes: notes ?? "",
+    }),
 };
