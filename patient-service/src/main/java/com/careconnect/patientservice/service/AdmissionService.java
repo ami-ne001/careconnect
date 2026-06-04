@@ -49,13 +49,21 @@ public class AdmissionService {
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + request.getRoomId()));
 
-        if (room.getStatus() != RoomStatus.AVAILABLE) {
-            throw new BadRequestException("Room is not available for admission (status: " + room.getStatus() + ")");
+        if (room.getStatus() == RoomStatus.MAINTENANCE) {
+            throw new BadRequestException("Room is under maintenance and cannot accept admissions.");
         }
 
-        // 1. Mark room as occupied
-        room.setStatus(RoomStatus.OCCUPIED);
-        roomRepository.save(room);
+        // Check if the requested bed number is already taken in this room
+        long activeInRoom = admissionRepository.countByRoomIdAndStatus(room.getId(), AdmissionStatus.ADMITTED);
+        if (activeInRoom >= room.getBedCount()) {
+            throw new BadRequestException("Room " + room.getRoomNumber() + " has no available beds (" + room.getBedCount() + " beds, all occupied).");
+        }
+
+        // 1. Mark room OCCUPIED only when it reaches full capacity
+        if (activeInRoom + 1 >= room.getBedCount()) {
+            room.setStatus(RoomStatus.OCCUPIED);
+            roomRepository.save(room);
+        }
 
         // 2. Create admission record
         Admission admission = Admission.builder()
@@ -157,15 +165,27 @@ public class AdmissionService {
             Room newRoom = roomRepository.findById(request.getRoomId())
                     .orElseThrow(() -> new ResourceNotFoundException("New Room not found with id: " + request.getRoomId()));
 
-            if (newRoom.getStatus() != RoomStatus.AVAILABLE) {
-                throw new BadRequestException("New Room is not available");
+            if (newRoom.getStatus() == RoomStatus.MAINTENANCE) {
+                throw new BadRequestException("New Room is under maintenance.");
             }
 
-            // Transfer bed occupancy
-            oldRoom.setStatus(RoomStatus.AVAILABLE);
-            newRoom.setStatus(RoomStatus.OCCUPIED);
-            roomRepository.save(oldRoom);
-            roomRepository.save(newRoom);
+            long takenInNewRoom = admissionRepository.countByRoomIdAndStatus(newRoom.getId(), AdmissionStatus.ADMITTED);
+            if (takenInNewRoom >= newRoom.getBedCount()) {
+                throw new BadRequestException("New Room has no available beds (" + newRoom.getBedCount() + " beds, all occupied).");
+            }
+
+            // Release old room if this was its last occupant
+            long remainingInOldRoom = admissionRepository.countByRoomIdAndStatus(oldRoom.getId(), AdmissionStatus.ADMITTED);
+            if (remainingInOldRoom - 1 <= 0) {
+                oldRoom.setStatus(RoomStatus.AVAILABLE);
+                roomRepository.save(oldRoom);
+            }
+
+            // Occupy new room if it reaches full capacity after this move
+            if (takenInNewRoom + 1 >= newRoom.getBedCount()) {
+                newRoom.setStatus(RoomStatus.OCCUPIED);
+                roomRepository.save(newRoom);
+            }
 
             admission.setRoom(newRoom);
         }
@@ -190,9 +210,13 @@ public class AdmissionService {
         PatientProfile patient = patientProfileRepository.findById(admission.getPatientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for patient id: " + admission.getPatientId()));
 
-        // 1. Release room
-        room.setStatus(RoomStatus.AVAILABLE);
-        roomRepository.save(room);
+        // 1. Release room — only set AVAILABLE if this was the last active admission in the room
+        long remainingInRoom = admissionRepository.countByRoomIdAndStatus(room.getId(), AdmissionStatus.ADMITTED);
+        // We subtract 1 because this admission hasn't been saved as DISCHARGED yet
+        if (remainingInRoom - 1 <= 0) {
+            room.setStatus(RoomStatus.AVAILABLE);
+            roomRepository.save(room);
+        }
 
         // 2. Complete discharge fields
         admission.setStatus(AdmissionStatus.DISCHARGED);

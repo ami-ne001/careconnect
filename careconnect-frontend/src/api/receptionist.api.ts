@@ -20,29 +20,37 @@ export interface RoomResponse {
 
 export interface AdmissionCreateRequest {
   patientId: number;
+  admittingDoctorId: number;
   roomId: number;
-  admissionDate: string;
-  reason: string;
+  bedNumber: number;
   expectedDischargeDate?: string;
+  admissionReason?: string;
+  diagnosis?: string;
 }
 
 export interface AdmissionResponse {
   id: number;
   patientId: number;
-  patientName?: string;
-  roomId: number;
-  roomNumber?: string;
-  wardName?: string;
+  admittingDoctorId: number;
+  room: RoomResponse;
+  bedNumber: number;
   admissionDate: string;
-  dischargeDate?: string;
-  reason: string;
   expectedDischargeDate?: string;
+  actualDischargeDate?: string;
+  admissionReason?: string;
+  diagnosis?: string;
   status: string;
+  dischargeStatus?: string;
+  conditionOnDischarge?: string;
+  dischargeNotes?: string;
+  followUpInstructions?: string;
 }
 
 export interface DischargeRequest {
-  dischargeDate: string;
+  dischargeStatus: "RECOVERED" | "AGAINST_MEDICAL_ADVICE" | "TRANSFERRED" | "DECEASED";
+  conditionOnDischarge: "STABLE" | "IMPROVED" | "UNCHANGED" | "CRITICAL";
   dischargeNotes?: string;
+  followUpInstructions?: string;
 }
 
 export interface PatientProfileCreateRequest {
