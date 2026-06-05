@@ -380,11 +380,20 @@ export const clinicalApi = {
   createSurgery: (body: SurgeryCreateRequest) =>
     api.post<SurgeryResponse>("/api/clinical/surgeries", body),
 
+  getSurgery: (id: number) =>
+    api.get<SurgeryResponse>(`/api/clinical/surgeries/${id}`),
+
   getSurgeriesBySurgeon: (surgeonId: number) =>
     api.get<SurgeryResponse[]>(`/api/clinical/surgeries/surgeon/${surgeonId}`),
 
   updateSurgeryStatus: (id: number, status: string) =>
     api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}`, { status }),
+
+  updateSurgery: (id: number, body: { preOpNotes?: string }) =>
+    api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}`, body),
+
+  addPostOpNotes: (id: number, body: { postOpNotes: string; outcome: string }) =>
+    api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}/post-op`, body),
 
   // Doctor Profiles
   getDoctorProfile: (userId: number) =>

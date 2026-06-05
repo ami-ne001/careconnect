@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { Calendar, Users, FlaskConical, Stethoscope, ChevronRight, Bed } from "lucide-react";
+import { Calendar, Users, FlaskConical, Stethoscope, ChevronRight, Bed, Scissors } from "lucide-react";
 import { StatCard } from "../../components/ui/StatCard";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
@@ -82,16 +82,10 @@ export function DoctorDashboard() {
   const upcomingSurgeries = surgeries.filter(s => s.status !== "COMPLETED" && s.status !== "CANCELLED");
 
   const now = new Date();
-  const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   return (
     <div>
-      <div className="bg-gradient-to-r from-[#1E3A5F] to-[#0EA5E9] rounded-xl p-5 mb-6 text-white">
-        <p className="text-white/70 text-sm mb-1">{greeting}</p>
-        <h2 className="font-bold text-xl">Dr. {firstName} {lastName} 👋</h2>
-        <p className="text-white/60 text-sm mt-0.5">{dateStr}</p>
-      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-7">
         <StatCard title="Today's Appointments" value={todayAppointments.length.toString()} subtitle="Scheduled today" icon={<Calendar size={20} className="text-[#0EA5E9]" />} iconBg="bg-sky-50" />
@@ -249,7 +243,7 @@ export function DoctorDashboard() {
       <div className="mt-6 bg-white rounded-xl border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
         <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🔪</span>
+            <Scissors size={18} className="text-[#1E3A5F]" />
             <h3 className="font-semibold text-[#0F172A]">Upcoming Surgeries</h3>
             <span className="px-2 py-0.5 rounded-full bg-[#0EA5E9] text-white text-xs font-bold">{upcomingSurgeries.length}</span>
           </div>

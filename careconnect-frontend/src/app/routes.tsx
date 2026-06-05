@@ -32,9 +32,7 @@ import { SurgeryDetail } from "./pages/doctor/SurgeryDetail";
 import { NurseDashboard } from "./pages/nurse/Dashboard";
 import { NursePatients } from "./pages/nurse/Patients";
 import { NurseVitals } from "./pages/nurse/VitalsMonitoring";
-import { NurseMedications } from "./pages/nurse/Medications";
 import { NurseCareTasks } from "./pages/nurse/CareTasks";
-import { NurseAppointments } from "./pages/nurse/Appointments";
 
 // Receptionist
 import { ReceptionistDashboard } from "./pages/receptionist/Dashboard";
@@ -95,9 +93,7 @@ export const router = createBrowserRouter([
       { path: "nurse/dashboard", Component: NurseDashboard },
       { path: "nurse/patients", Component: NursePatients },
       { path: "nurse/vitals-monitoring", Component: NurseVitals },
-      { path: "nurse/medications", Component: NurseMedications },
       { path: "nurse/care-tasks", Component: NurseCareTasks },
-      { path: "nurse/appointments", Component: NurseAppointments },
       // Receptionist
       { path: "receptionist/dashboard", Component: ReceptionistDashboard },
       { path: "receptionist/appointments", Component: ReceptionistAppointments },

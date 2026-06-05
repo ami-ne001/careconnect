@@ -39,9 +39,7 @@ const navByRole: Record<string, NavItem[]> = {
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/nurse/dashboard" },
     { label: "Patients", icon: <Users size={18} />, path: "/nurse/patients" },
     { label: "Vitals Monitoring", icon: <HeartPulse size={18} />, path: "/nurse/vitals-monitoring" },
-    { label: "Medications", icon: <Pill size={18} />, path: "/nurse/medications" },
     { label: "Care Tasks", icon: <ClipboardList size={18} />, path: "/nurse/care-tasks" },
-    { label: "Appointments", icon: <Calendar size={18} />, path: "/nurse/appointments" },
   ],
   Receptionist: [
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/receptionist/dashboard" },
