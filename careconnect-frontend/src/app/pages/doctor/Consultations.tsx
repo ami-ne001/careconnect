@@ -89,7 +89,7 @@ export function DoctorConsultations() {
   const [operatingRooms, setOperatingRooms] = useState<OperatingRoomResponse[]>([]);
   const [surgeryForm, setSurgeryForm] = useState({
     surgeryType: "", operatingRoomId: "", scheduledAt: "", estimatedDuration: "60",
-    priority: "NORMAL", preOpNotes: "",
+    priority: "ELECTIVE", preOpNotes: "",
   });
   const [submittingSurgery, setSubmittingSurgery] = useState(false);
   const [surgeryDone, setSurgeryDone] = useState(false);
@@ -298,13 +298,13 @@ export function DoctorConsultations() {
       appointmentApi.getAppointmentsByDoctor(userId!),
     ])
       .then(([{ data: q }, { data: appts }]) => {
-        // Only show queue entries that belong to this doctor
-        const myApptIds = new Set((appts || []).map((a) => a.id));
+        const validAppts = (appts || []).filter((a) => a.status !== "COMPLETED");
+        const validApptIds = new Set(validAppts.map((a) => a.id));
         const myQueue = (q || []).filter(
-          (qe) => myApptIds.has(qe.appointmentId) && qe.status !== "COMPLETED" && qe.status !== "DONE"
+          (qe) => validApptIds.has(qe.appointmentId) && (qe.status === "CALLED" || qe.status === "IN_ROOM")
         );
         setQueue(myQueue);
-        setAppointments(appts || []);
+        setAppointments(validAppts);
       })
       .catch((err) => toast.error(getApiErrorMessage(err, "Failed to load queue.")))
       .finally(() => setLoadingQueue(false));
@@ -1237,7 +1237,7 @@ export function DoctorConsultations() {
                             onChange={(e) => setSurgeryForm(f => ({ ...f, priority: e.target.value }))}
                             className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#EF4444] bg-white"
                           >
-                            <option value="NORMAL">Normal</option>
+                            <option value="ELECTIVE">Elective</option>
                             <option value="URGENT">Urgent</option>
                             <option value="EMERGENCY">Emergency</option>
                           </select>

@@ -37,6 +37,12 @@ export interface DoctorAvailabilityResponse {
   endTime: string;
 }
 
+export interface DoctorAvailabilityRequest {
+  dayOfWeek: string;
+  startTime: string; // "HH:mm"
+  endTime: string;   // "HH:mm"
+}
+
 export interface QueueResponse {
   id: number;
   appointmentId: number;
@@ -74,6 +80,14 @@ export const appointmentApi = {
 
   getDoctorAvailability: (doctorId: number) =>
     api.get<DoctorAvailabilityResponse[]>(`/api/availability/doctor/${doctorId}`),
+
+  setDoctorAvailability: (doctorId: number | undefined, body: DoctorAvailabilityRequest) => {
+    const url = doctorId ? `/api/availability?doctorId=${doctorId}` : '/api/availability';
+    return api.post<DoctorAvailabilityResponse>(url, body);
+  },
+
+  deleteDoctorAvailability: (id: number) =>
+    api.delete<void>(`/api/availability/${id}`),
 
   // Queue
   getTodayQueue: () => api.get<QueueResponse[]>("/api/queue/today"),

@@ -11,7 +11,7 @@ const priorityBadge = (p: string): "urgent" | "warning" | "info" => p === "URGEN
 const columns = [
   { id: "PENDING", label: "To Do", color: "border-t-[#E2E8F0]", dot: "bg-[#94A3B8]" },
   { id: "IN_PROGRESS", label: "In Progress", color: "border-t-[#0EA5E9]", dot: "bg-[#0EA5E9]" },
-  { id: "COMPLETED", label: "Completed", color: "border-t-[#10B981]", dot: "bg-[#10B981]" },
+  { id: "DONE", label: "Done", color: "border-t-[#10B981]", dot: "bg-[#10B981]" },
 ];
 
 export function NurseCareTasks() {
@@ -79,7 +79,7 @@ export function NurseCareTasks() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {columns.map((col) => {
-            const colTasks = tasks.filter((t) => t.status === col.id || (col.id === "PENDING" && t.status !== "IN_PROGRESS" && t.status !== "COMPLETED"));
+            const colTasks = tasks.filter((t) => t.status === col.id || (col.id === "PENDING" && t.status !== "IN_PROGRESS" && t.status !== "DONE"));
             return (
               <div key={col.id}>
                 <div className="flex items-center gap-2 mb-3">
@@ -103,13 +103,13 @@ export function NurseCareTasks() {
                           <span className="text-xs text-[#64748B] truncate max-w-[80px]">{nurseName}</span>
                         </div>
                         <select
-                          value={t.status === "IN_PROGRESS" ? "IN_PROGRESS" : t.status === "COMPLETED" ? "COMPLETED" : "PENDING"}
+                          value={t.status === "IN_PROGRESS" ? "IN_PROGRESS" : t.status === "DONE" ? "DONE" : "PENDING"}
                           onChange={(e) => moveTask(t.id, e.target.value)}
                           className="text-xs border border-[#E2E8F0] rounded-lg px-2 py-1 text-[#64748B] outline-none bg-white focus:ring-1 focus:ring-[#0EA5E9]"
                         >
                           <option value="PENDING">To Do</option>
                           <option value="IN_PROGRESS">In Progress</option>
-                          <option value="COMPLETED">Completed</option>
+                          <option value="DONE">Done</option>
                         </select>
                       </div>
                     </div>

@@ -253,7 +253,25 @@ export interface PrescriptionCreateRequest {
   items: PrescriptionItemDto[];
 }
 
-// ── Misc ──────────────────────────────────────────────────────────
+// ── Doctor Profile ─────────────────────────────────────────────
+export interface DoctorProfileResponse {
+  id: number;
+  userId: number;
+  isSurgeon: boolean;
+  specialty?: string;
+  licenseNumber?: string;
+  yearsExperience?: number;
+  bio?: string;
+}
+
+export interface DoctorProfileUpdateRequest {
+  isSurgeon?: boolean;
+  specialty?: string;
+  licenseNumber?: string;
+  yearsExperience?: number;
+  bio?: string;
+}
+
 export interface MedicalDocumentCreateRequest {
   patientId: number;
   documentType: string;
@@ -339,6 +357,9 @@ export const clinicalApi = {
   getOperatingRooms: () =>
     api.get<OperatingRoomResponse[]>("/api/clinical/operating-rooms"),
 
+  createOperatingRoom: (name: string, notes?: string) =>
+    api.post<OperatingRoomResponse>("/api/clinical/operating-rooms", { name, notes }),
+
   updateOperatingRoomStatus: (id: number, status: string, notes?: string) =>
     api.put<OperatingRoomResponse>(`/api/clinical/operating-rooms/${id}/status`, {
       status,
@@ -359,9 +380,25 @@ export const clinicalApi = {
   createSurgery: (body: SurgeryCreateRequest) =>
     api.post<SurgeryResponse>("/api/clinical/surgeries", body),
 
+  getSurgery: (id: number) =>
+    api.get<SurgeryResponse>(`/api/clinical/surgeries/${id}`),
+
   getSurgeriesBySurgeon: (surgeonId: number) =>
     api.get<SurgeryResponse[]>(`/api/clinical/surgeries/surgeon/${surgeonId}`),
 
   updateSurgeryStatus: (id: number, status: string) =>
     api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}`, { status }),
+
+  updateSurgery: (id: number, body: { preOpNotes?: string }) =>
+    api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}`, body),
+
+  addPostOpNotes: (id: number, body: { postOpNotes: string; outcome: string }) =>
+    api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}/post-op`, body),
+
+  // Doctor Profiles
+  getDoctorProfile: (userId: number) =>
+    api.get<DoctorProfileResponse>(`/api/clinical/doctors/${userId}`),
+
+  updateDoctorProfile: (userId: number, body: DoctorProfileUpdateRequest) =>
+    api.put<DoctorProfileResponse>(`/api/clinical/doctors/${userId}`, body),
 };

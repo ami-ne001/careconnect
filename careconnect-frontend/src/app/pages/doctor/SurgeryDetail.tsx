@@ -1,41 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Check, DollarSign } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { Badge } from "../../components/ui/Badge";
+import { clinicalApi, SurgeryResponse } from "../../../api/clinical.api";
+import { patientApi } from "../../../api/patient.api";
+import type { PatientProfileResponse } from "../../../types/patient.types";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
-const STEPS = ["Scheduled", "Pre-Op Prep", "In Progress", "Post-Op Recovery", "Completed"];
-
-const surgery = {
-  id: "surg-001",
-  type: "Coronary Artery Bypass Graft (CABG)",
-  status: "Pre-Op Prep",
-  patient: {
-    name: "John Whitaker",
-    initials: "JW",
-    dob: "March 5, 1963",
-    blood: "O+",
-    allergies: ["Penicillin", "NSAIDs"],
-    conditions: ["CAD", "Hypertension", "T2DM"],
-  },
-  info: {
-    leadSurgeon: "Dr. Sarah Mitchell",
-    assistSurgeon: "Dr. James Holloway",
-    nurse: "Nurse Rachel Kim",
-    or: "OR-2",
-    dateTime: "June 17, 2025 — 08:00 AM",
-    duration: "4 hours",
-    priority: "Urgent",
-  },
-  preOpNotes: "Patient cleared for surgery. Fasting since midnight. IV access established. Consent signed. Pre-op antibiotics administered.",
-  vitals: { bp: "152/94", hr: "98 bpm", temp: "37.1 °C", o2: "97%", weight: "88 kg" },
-  timeline: [
-    { event: "Surgery Scheduled", time: "June 14, 2025", user: "Dr. Mitchell" },
-    { event: "Pre-Op Prep Started", time: "June 17, 06:30 AM", user: "Nurse Rachel Kim" },
-    { event: "Pre-Op Completed", time: "June 17, 07:45 AM", user: "Nurse Rachel Kim" },
-  ],
-  billing: { estimated: 8400, status: "Pending" },
-  admission: { room: "Room 501", ward: "CCU", admitDate: "June 16, 2025" },
-};
+const STEPS = ["SCHEDULED", "PRE_OP", "IN_PROGRESS", "POST_OP", "COMPLETED"];
 
 function StatusStepper({ currentStep }: { currentStep: string }) {
   const currentIdx = STEPS.indexOf(currentStep);
@@ -51,7 +24,7 @@ function StatusStepper({ currentStep }: { currentStep: string }) {
                 ${isDone ? "bg-[#10B981] text-white" : isActive ? "bg-[#0EA5E9] text-white ring-4 ring-[#0EA5E9]/20" : "bg-[#E2E8F0] text-[#94A3B8]"}`}>
                 {isDone ? <Check size={14} /> : i + 1}
               </div>
-              <span className={`text-[10px] mt-1.5 text-center w-full px-1 ${isActive ? "text-[#0EA5E9] font-semibold" : isDone ? "text-[#10B981]" : "text-[#94A3B8]"}`}>{step}</span>
+              <span className={`text-[10px] mt-1.5 text-center w-full px-1 ${isActive ? "text-[#0EA5E9] font-semibold" : isDone ? "text-[#10B981]" : "text-[#94A3B8]"}`}>{step.replace("_", " ")}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div className={`h-0.5 flex-1 mx-1 mb-4 ${i < currentIdx ? "bg-[#10B981]" : "bg-[#E2E8F0]"}`} style={{ minWidth: 12 }} />
@@ -66,7 +39,86 @@ function StatusStepper({ currentStep }: { currentStep: string }) {
 export function SurgeryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [preOpNotes, setPreOpNotes] = useState(surgery.preOpNotes);
+  const [surgery, setSurgery] = useState<SurgeryResponse | null>(null);
+  const [patient, setPatient] = useState<PatientProfileResponse | null>(null);
+  const [preOpNotes, setPreOpNotes] = useState("");
+  const [postOpNotes, setPostOpNotes] = useState("");
+  const [outcome, setOutcome] = useState("SUCCESSFUL");
+  const [loading, setLoading] = useState(true);
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      clinicalApi.getSurgery(Number(id)).then(res => {
+        setSurgery(res.data);
+        setPreOpNotes(res.data.preOpNotes || "");
+        setPostOpNotes(res.data.postOpNotes || "");
+        setOutcome(res.data.outcome || "SUCCESSFUL");
+        if (res.data.patientId) {
+          patientApi.getProfileById(res.data.patientId).then(pRes => {
+            setPatient(pRes.data);
+          }).catch(console.error);
+        }
+      }).catch(err => {
+        toast.error("Failed to load surgery details.");
+      }).finally(() => {
+        setLoading(false);
+      });
+    }
+  }, [id]);
+
+  const handleUpdateStatus = async () => {
+    if (!surgery) return;
+    const currentIdx = STEPS.indexOf(surgery.status);
+    if (currentIdx >= 0 && currentIdx < STEPS.length - 1) {
+      const nextStatus = STEPS[currentIdx + 1];
+      try {
+        await clinicalApi.updateSurgeryStatus(surgery.id, nextStatus);
+        toast.success(`Surgery status updated to ${nextStatus.replace("_", " ")}`);
+        const res = await clinicalApi.getSurgery(Number(id));
+        setSurgery(res.data);
+      } catch (err) {
+        toast.error(getApiErrorMessage(err, "Failed to update surgery status"));
+      }
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!surgery) return;
+    setSavingNotes(true);
+    try {
+      if (surgery.status === "COMPLETED" || surgery.status === "POST_OP") {
+        await clinicalApi.addPostOpNotes(surgery.id, { postOpNotes, outcome });
+        toast.success("Post-op notes saved");
+      } else {
+        await clinicalApi.updateSurgery(surgery.id, { preOpNotes });
+        toast.success("Pre-op notes saved");
+      }
+      const res = await clinicalApi.getSurgery(Number(id));
+      setSurgery(res.data);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to save notes"));
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center text-[#64748B]">Loading...</div>;
+  if (!surgery) return <div className="p-8 text-center text-[#64748B]">Surgery not found.</div>;
+
+  const getPatientInitials = () => {
+    if (!patient) return `P`;
+    return `${patient.firstName?.[0] || ""}${patient.lastName?.[0] || ""}`;
+  };
+
+  const getStatusVariant = (status: string) => {
+    if (status === "COMPLETED") return "active";
+    if (status === "SCHEDULED") return "info";
+    if (status === "CANCELLED") return "error";
+    return "pending";
+  };
+
+  const isPostOpEnabled = surgery.status === "IN_PROGRESS" || surgery.status === "POST_OP" || surgery.status === "COMPLETED";
 
   return (
     <div>
@@ -79,11 +131,18 @@ export function SurgeryDetail() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
           <div>
             <p className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">Surgery</p>
-            <h1 className="font-bold text-[#0F172A]" style={{ fontSize: 22 }}>{surgery.type}</h1>
+            <h1 className="font-bold text-[#0F172A]" style={{ fontSize: 22 }}>{surgery.surgeryType}</h1>
           </div>
           <div className="flex gap-3">
-            <Badge variant="pending">{surgery.status}</Badge>
-            <button className="px-4 py-2 rounded-lg bg-[#0EA5E9] text-white text-sm font-medium hover:opacity-90">Update Status</button>
+            <Badge variant={getStatusVariant(surgery.status) as any}>{surgery.status.replace("_", " ")}</Badge>
+            {STEPS.indexOf(surgery.status) < STEPS.length - 1 && surgery.status !== "CANCELLED" && (
+              <button 
+                onClick={handleUpdateStatus}
+                className="px-4 py-2 rounded-lg bg-[#0EA5E9] text-white text-sm font-medium hover:opacity-90"
+              >
+                Update to {STEPS[STEPS.indexOf(surgery.status) + 1].replace("_", " ")}
+              </button>
+            )}
           </div>
         </div>
         <StatusStepper currentStep={surgery.status} />
@@ -96,18 +155,10 @@ export function SurgeryDetail() {
           <div className="bg-white rounded-xl p-5 border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
             <h3 className="font-semibold text-[#0F172A] mb-4">Patient</h3>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#1E3A5F] flex items-center justify-center text-white font-bold shrink-0">{surgery.patient.initials}</div>
+              <div className="w-12 h-12 rounded-2xl bg-[#1E3A5F] flex items-center justify-center text-white font-bold shrink-0">{getPatientInitials()}</div>
               <div className="flex-1">
-                <h4 className="font-bold text-[#0F172A] mb-0.5">{surgery.patient.name}</h4>
-                <p className="text-sm text-[#64748B] mb-3">DOB: {surgery.patient.dob} · Blood: <span className="font-semibold text-red-600">{surgery.patient.blood}</span></p>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  <span className="text-xs font-medium text-[#64748B]">Allergies:</span>
-                  {surgery.patient.allergies.map((a) => <span key={a} className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">{a}</span>)}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-xs font-medium text-[#64748B]">Conditions:</span>
-                  {surgery.patient.conditions.map((c) => <span key={c} className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">{c}</span>)}
-                </div>
+                <h4 className="font-bold text-[#0F172A] mb-0.5">{patient ? `${patient.firstName} ${patient.lastName}` : `Patient #${surgery.patientId}`}</h4>
+                <p className="text-sm text-[#64748B] mb-3">DOB: {patient?.dateOfBirth || "Unknown"} · Blood: <span className="font-semibold text-red-600">{patient?.bloodType || "Unknown"}</span></p>
               </div>
             </div>
           </div>
@@ -117,12 +168,12 @@ export function SurgeryDetail() {
             <h3 className="font-semibold text-[#0F172A] mb-4">Surgery Information</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "Lead Surgeon", val: surgery.info.leadSurgeon },
-                { label: "Assisting Surgeon", val: surgery.info.assistSurgeon },
-                { label: "Assisting Nurse", val: surgery.info.nurse },
-                { label: "Operating Room", val: surgery.info.or },
-                { label: "Date & Time", val: surgery.info.dateTime },
-                { label: "Est. Duration", val: surgery.info.duration },
+                { label: "Lead Surgeon ID", val: String(surgery.leadSurgeonId) },
+                { label: "Assisting Surgeon ID", val: surgery.assistingSurgeonId ? String(surgery.assistingSurgeonId) : "None" },
+                { label: "Assisting Nurse ID", val: surgery.assistingNurseId ? String(surgery.assistingNurseId) : "None" },
+                { label: "Operating Room", val: surgery.operatingRoomName },
+                { label: "Scheduled Date & Time", val: new Date(surgery.scheduledAt).toLocaleString() },
+                { label: "Est. Duration", val: `${surgery.estimatedDuration} mins` },
               ].map((f) => (
                 <div key={f.label} className="p-3 rounded-lg bg-[#F8FAFC]">
                   <p className="text-xs text-[#94A3B8] mb-0.5">{f.label}</p>
@@ -132,7 +183,7 @@ export function SurgeryDetail() {
             </div>
             <div className="mt-3 flex items-center gap-2">
               <span className="text-xs text-[#64748B]">Priority:</span>
-              <Badge variant="warning">{surgery.info.priority}</Badge>
+              <Badge variant="warning">{surgery.priority}</Badge>
             </div>
           </div>
 
@@ -143,21 +194,43 @@ export function SurgeryDetail() {
               rows={4}
               value={preOpNotes}
               onChange={(e) => setPreOpNotes(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] resize-none"
+              disabled={isPostOpEnabled && surgery.status !== "IN_PROGRESS"}
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] resize-none disabled:bg-[#F8FAFC]"
             />
-            <button className="mt-2 px-4 py-2 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90">Save Notes</button>
+            {!isPostOpEnabled && (
+              <button disabled={savingNotes} onClick={handleSaveNotes} className="mt-2 px-4 py-2 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90">
+                {savingNotes ? "Saving..." : "Save Pre-Op Notes"}
+              </button>
+            )}
           </div>
 
           {/* Post-Op Notes */}
-          <div className="bg-white rounded-xl p-5 border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h3 className="font-semibold text-[#0F172A] mb-3">Post-Op Notes</h3>
+          <div className={`bg-white rounded-xl p-5 border border-[#E2E8F0] ${!isPostOpEnabled ? "opacity-60" : ""}`} style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold text-[#0F172A]">Post-Op Notes</h3>
+              {isPostOpEnabled && (
+                <select value={outcome} onChange={e => setOutcome(e.target.value)} className="text-sm border border-[#E2E8F0] rounded-lg px-2 py-1 outline-none">
+                  <option value="SUCCESSFUL">Successful</option>
+                  <option value="COMPLICATIONS">Complications</option>
+                  <option value="FAILED">Failed</option>
+                </select>
+              )}
+            </div>
             <textarea
               rows={3}
-              disabled
-              placeholder="Add post-operative notes after procedure"
-              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm bg-[#F8FAFC] text-[#94A3B8] resize-none cursor-not-allowed"
+              disabled={!isPostOpEnabled}
+              value={postOpNotes}
+              onChange={(e) => setPostOpNotes(e.target.value)}
+              placeholder={isPostOpEnabled ? "Enter post-operative notes..." : "Add post-operative notes after procedure"}
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm bg-white disabled:bg-[#F8FAFC] text-[#0F172A] disabled:text-[#94A3B8] resize-none"
             />
-            <p className="text-xs text-[#94A3B8] mt-1.5">Available once surgery is In Progress or beyond.</p>
+            {!isPostOpEnabled ? (
+              <p className="text-xs text-[#94A3B8] mt-1.5">Available once surgery is In Progress or beyond.</p>
+            ) : (
+              <button disabled={savingNotes} onClick={handleSaveNotes} className="mt-2 px-4 py-2 rounded-lg bg-[#10B981] text-white text-sm font-medium hover:opacity-90">
+                {savingNotes ? "Saving..." : "Save Post-Op Notes"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -165,62 +238,21 @@ export function SurgeryDetail() {
         <div className="xl:col-span-2 space-y-5">
           {/* Timeline */}
           <div className="bg-white rounded-xl p-5 border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h3 className="font-semibold text-[#0F172A] mb-4">Surgery Timeline</h3>
-            <div className="relative">
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-[#E2E8F0]" />
-              <div className="space-y-4">
-                {surgery.timeline.map((t, i) => (
-                  <div key={i} className="flex gap-4 relative">
-                    <div className="w-8 h-8 rounded-full bg-[#0EA5E9]/10 border-2 border-[#0EA5E9] flex items-center justify-center shrink-0 relative z-10">
-                      <Check size={12} className="text-[#0EA5E9]" />
-                    </div>
-                    <div className="pb-2">
-                      <p className="text-sm font-medium text-[#0F172A]">{t.event}</p>
-                      <p className="text-xs text-[#94A3B8]">{t.time} · {t.user}</p>
-                    </div>
-                  </div>
-                ))}
+            <h3 className="font-semibold text-[#0F172A] mb-4">Surgery Details</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between border-b border-[#E2E8F0] pb-2">
+                <span className="text-sm text-[#64748B]">Actual Start</span>
+                <span className="text-sm font-medium text-[#0F172A]">{surgery.actualStartAt ? new Date(surgery.actualStartAt).toLocaleString() : "Not started"}</span>
+              </div>
+              <div className="flex justify-between border-b border-[#E2E8F0] pb-2">
+                <span className="text-sm text-[#64748B]">Actual End</span>
+                <span className="text-sm font-medium text-[#0F172A]">{surgery.actualEndAt ? new Date(surgery.actualEndAt).toLocaleString() : "Not ended"}</span>
+              </div>
+              <div className="flex justify-between border-b border-[#E2E8F0] pb-2">
+                <span className="text-sm text-[#64748B]">Outcome</span>
+                <span className="text-sm font-medium text-[#0F172A]">{surgery.outcome || "Pending"}</span>
               </div>
             </div>
-          </div>
-
-          {/* Pre-op vitals */}
-          <div className="bg-white rounded-xl p-5 border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h3 className="font-semibold text-[#0F172A] mb-3">Pre-Op Vitals</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(surgery.vitals).map(([k, v]) => (
-                <div key={k} className="p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0]">
-                  <p className="text-xs text-[#94A3B8] capitalize mb-0.5">{k === "bp" ? "Blood Pressure" : k === "hr" ? "Heart Rate" : k === "temp" ? "Temperature" : k === "o2" ? "O₂ Sat." : "Weight"}</p>
-                  <p className="text-sm font-bold text-[#0F172A]">{v}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Related admission */}
-          <div className="bg-white rounded-xl p-5 border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h3 className="font-semibold text-[#0F172A] mb-3">Related Admission</h3>
-            <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl p-3">
-              <p className="font-medium text-[#0F172A] text-sm">{surgery.patient.name}</p>
-              <p className="text-xs text-[#64748B]">{surgery.admission.room} · {surgery.admission.ward}</p>
-              <p className="text-xs text-[#64748B]">Admitted {surgery.admission.admitDate}</p>
-            </div>
-          </div>
-
-          {/* Billing */}
-          <div className="bg-white rounded-xl p-5 border border-[#E2E8F0]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h3 className="font-semibold text-[#0F172A] mb-3">Billing</h3>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-xs text-[#94A3B8]">Estimated Cost</p>
-                <p className="text-2xl font-bold text-[#0F172A]">${surgery.billing.estimated.toLocaleString()}</p>
-              </div>
-              <Badge variant="pending">{surgery.billing.status}</Badge>
-            </div>
-            <p className="text-xs text-[#94A3B8] mb-3">Pending invoice generation</p>
-            <button className="w-full h-9 rounded-lg bg-[#10B981] text-white text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2">
-              <DollarSign size={14} />Generate Invoice
-            </button>
           </div>
         </div>
       </div>

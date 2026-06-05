@@ -13,6 +13,8 @@ import { AdminAuditLogs } from "./pages/admin/AuditLogs";
 import { AdminReports } from "./pages/admin/Reports";
 import { AdminSystemConfig } from "./pages/admin/SystemConfig";
 import { OperatingRooms } from "./pages/admin/OperatingRooms";
+import { DoctorAvailabilities } from "./pages/admin/DoctorAvailabilities";
+import { AdminWardsRooms } from "./pages/admin/AdminWardsRooms";
 
 // Doctor
 import { DoctorDashboard } from "./pages/doctor/Dashboard";
@@ -30,9 +32,7 @@ import { SurgeryDetail } from "./pages/doctor/SurgeryDetail";
 import { NurseDashboard } from "./pages/nurse/Dashboard";
 import { NursePatients } from "./pages/nurse/Patients";
 import { NurseVitals } from "./pages/nurse/VitalsMonitoring";
-import { NurseMedications } from "./pages/nurse/Medications";
 import { NurseCareTasks } from "./pages/nurse/CareTasks";
-import { NurseAppointments } from "./pages/nurse/Appointments";
 
 // Receptionist
 import { ReceptionistDashboard } from "./pages/receptionist/Dashboard";
@@ -76,6 +76,8 @@ export const router = createBrowserRouter([
       { path: "admin/reports", Component: AdminReports },
       { path: "admin/system-config", Component: AdminSystemConfig },
       { path: "admin/operating-rooms", Component: OperatingRooms },
+      { path: "admin/doctor-schedules", Component: DoctorAvailabilities },
+      { path: "admin/wards-rooms", Component: AdminWardsRooms },
       // Doctor
       { path: "doctor/dashboard", Component: DoctorDashboard },
       { path: "doctor/appointments", Component: DoctorAppointments },
@@ -91,9 +93,7 @@ export const router = createBrowserRouter([
       { path: "nurse/dashboard", Component: NurseDashboard },
       { path: "nurse/patients", Component: NursePatients },
       { path: "nurse/vitals-monitoring", Component: NurseVitals },
-      { path: "nurse/medications", Component: NurseMedications },
       { path: "nurse/care-tasks", Component: NurseCareTasks },
-      { path: "nurse/appointments", Component: NurseAppointments },
       // Receptionist
       { path: "receptionist/dashboard", Component: ReceptionistDashboard },
       { path: "receptionist/appointments", Component: ReceptionistAppointments },

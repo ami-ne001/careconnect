@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { X, Plus, ChevronDown, Search, Check } from "lucide-react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { X, Plus, ChevronDown, Search, Check, Scissors, CheckCircle2, CalendarClock, Activity } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { StatCard } from "../../components/ui/StatCard";
@@ -7,7 +7,12 @@ import { useNavigate } from "react-router";
 import { useAuth } from "../../../store/useAuth";
 import { clinicalApi, SurgeryResponse, OperatingRoomOverviewResponse } from "../../../api/clinical.api";
 import { patientApi } from "../../../api/patient.api";
+import { receptionistApi } from "../../../api/receptionist.api";
+import { adminApi } from "../../../api/admin.api";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "../../../utils/apiError";
 import type { PatientProfileResponse } from "../../../types/patient.types";
+import type { AdminUser } from "../../../types/auth.types";
 
 const STEPS = ["SCHEDULED", "PRE_OP", "IN_PROGRESS", "POST_OP", "COMPLETED"];
 
@@ -39,31 +44,85 @@ function StatusStepper({ currentStep }: { currentStep: string }) {
   );
 }
 
-function ScheduleSurgeryModal({ onClose }: { onClose: () => void }) {
-  const [selectedOR, setSelectedOR] = useState<string | null>(null);
+function ScheduleSurgeryModal({ onClose, onRefresh }: { onClose: () => void, onRefresh: () => void }) {
+  const { userId } = useAuth();
+  const [selectedOR, setSelectedOR] = useState<number | null>(null);
   const [priority, setPriority] = useState("ELECTIVE");
   const [selectedType, setSelectedType] = useState("");
   const [orOverview, setOrOverview] = useState<OperatingRoomOverviewResponse | null>(null);
+  
+  const [patients, setPatients] = useState<PatientProfileResponse[]>([]);
+  const [doctors, setDoctors] = useState<AdminUser[]>([]);
+  const [nurses, setNurses] = useState<AdminUser[]>([]);
+  
+  const [patientId, setPatientId] = useState<number | "">("");
+  const [assistingSurgeonId, setAssistingSurgeonId] = useState<number | "">("");
+  const [assistingNurseId, setAssistingNurseId] = useState<number | "">("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [duration, setDuration] = useState("2");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     clinicalApi.getOperatingRoomsOverview().then(res => setOrOverview(res.data)).catch(console.error);
+    receptionistApi.getPatientsList(0, 100).then(res => setPatients(res.data.content)).catch(console.error);
+    adminApi.getUsers("DOCTOR").then(res => setDoctors(res.data)).catch(console.error);
+    adminApi.getUsers("NURSE").then(res => setNurses(res.data)).catch(console.error);
   }, []);
+
+  const handleSchedule = async () => {
+    if (!patientId || !selectedOR || !selectedType || !date || !time || !userId) {
+      toast.error("Please fill in all required fields (Patient, OR, Type, Date, Time)");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const scheduledAt = `${date}T${time}:00`;
+      await clinicalApi.createSurgery({
+        patientId: Number(patientId),
+        leadSurgeonId: userId,
+        assistingSurgeonId: assistingSurgeonId ? Number(assistingSurgeonId) : undefined,
+        assistingNurseId: assistingNurseId ? Number(assistingNurseId) : undefined,
+        operatingRoomId: selectedOR,
+        surgeryType: selectedType,
+        priority: priority,
+        scheduledAt,
+        estimatedDuration: Number(duration) * 60, // assume duration is hours, converting to minutes
+      });
+      toast.success("Surgery scheduled successfully!");
+      onRefresh();
+      onClose();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to schedule surgery"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#E2E8F0]">
           <h3 className="font-bold text-[#0F172A] text-lg">Schedule New Surgery</h3>
-          <button onClick={onClose}><X size={18} className="text-[#64748B]" /></button>
+          <button disabled={loading} onClick={onClose}><X size={18} className="text-[#64748B]" /></button>
         </div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left */}
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Patient Search</label>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Patient <span className="text-red-500">*</span></label>
               <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-                <input className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" placeholder="Search by name or ID..." />
+                <select 
+                  value={patientId}
+                  onChange={(e) => setPatientId(Number(e.target.value))}
+                  className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                >
+                  <option value="">Select a patient...</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>{p.firstName} {p.lastName} (ID: {p.id})</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div>
@@ -75,33 +134,37 @@ function ScheduleSurgeryModal({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Lead Surgeon</label>
-              <input defaultValue="Current User" className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
-            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Assisting Surgeon</label>
                 <div className="relative">
-                  <select className="w-full h-10 px-3 pr-8 rounded-lg border border-[#E2E8F0] text-sm bg-white focus:outline-none appearance-none">
-                    <option value="">Optional</option>
+                  <select 
+                    value={assistingSurgeonId}
+                    onChange={(e) => setAssistingSurgeonId(Number(e.target.value) || "")}
+                    className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                  >
+                    <option value="">None</option>
+                    {doctors.filter(d => d.id !== userId).map(d => (
+                      <option key={d.id} value={d.id}>{d.firstName} {d.lastName}</option>
+                    ))}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Assisting Nurse</label>
                 <div className="relative">
-                  <select className="w-full h-10 px-3 pr-8 rounded-lg border border-[#E2E8F0] text-sm bg-white focus:outline-none appearance-none">
-                    <option value="">Optional</option>
+                  <select 
+                    value={assistingNurseId}
+                    onChange={(e) => setAssistingNurseId(Number(e.target.value) || "")}
+                    className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                  >
+                    <option value="">None</option>
+                    {nurses.map(n => (
+                      <option key={n.id} value={n.id}>{n.firstName} {n.lastName}</option>
+                    ))}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none" />
                 </div>
               </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Pre-Op Notes</label>
-              <textarea rows={3} className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] resize-none" placeholder="Pre-operative notes and preparation instructions..." />
             </div>
           </div>
 
@@ -109,31 +172,32 @@ function ScheduleSurgeryModal({ onClose }: { onClose: () => void }) {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Date</label>
-                <input type="date" className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Date <span className="text-red-500">*</span></label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Time</label>
-                <input type="time" className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Time <span className="text-red-500">*</span></label>
+                <input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Estimated Duration</label>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Estimated Duration <span className="text-red-500">*</span></label>
               <div className="flex gap-2">
                 <div className="flex items-center gap-1.5 flex-1">
-                  <input type="number" defaultValue="2" className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                  <input type="number" value={duration} onChange={e => setDuration(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
                   <span className="text-sm text-[#64748B] whitespace-nowrap">hrs</span>
                 </div>
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Operating Room</label>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Operating Room <span className="text-red-500">*</span></label>
               <div className="grid grid-cols-2 gap-2">
                 {orOverview?.rooms.map((or) => (
                   <button
+                    type="button"
                     key={or.id}
-                    onClick={() => setSelectedOR(or.name)}
-                    className={`p-3 rounded-xl border text-left transition-all ${selectedOR === or.name ? "border-[#1E3A5F] bg-[#EFF6FF]" : "border-[#E2E8F0] hover:border-[#0EA5E9]"}`}
+                    onClick={() => setSelectedOR(or.id)}
+                    className={`p-3 rounded-xl border text-left transition-all ${selectedOR === or.id ? "border-[#1E3A5F] bg-[#EFF6FF]" : "border-[#E2E8F0] hover:border-[#0EA5E9]"}`}
                   >
                     <p className="font-semibold text-[#0F172A] text-sm">{or.name}</p>
                     <p className={`text-xs font-medium ${or.status === "AVAILABLE" ? "text-emerald-600" : or.status === "IN_USE" ? "text-red-500" : "text-amber-500"}`}>{or.status}</p>
@@ -156,8 +220,10 @@ function ScheduleSurgeryModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <div className="px-6 py-4 border-t border-[#E2E8F0] flex justify-end gap-3">
-          <button onClick={onClose} className="px-5 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B] hover:bg-[#F8FAFC]">Cancel</button>
-          <button onClick={onClose} className="px-5 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold hover:opacity-90">Schedule</button>
+          <button disabled={loading} onClick={onClose} className="px-5 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B] hover:bg-[#F8FAFC]">Cancel</button>
+          <button disabled={loading} onClick={handleSchedule} className="px-5 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold hover:opacity-90 flex items-center gap-2">
+            {loading ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : "Schedule"}
+          </button>
         </div>
       </div>
     </div>
@@ -173,11 +239,10 @@ export function DoctorSurgeries() {
   const [surgeries, setSurgeries] = useState<SurgeryResponse[]>([]);
   const [patients, setPatients] = useState<Record<number, PatientProfileResponse>>({});
 
-  useEffect(() => {
+  const fetchSurgeries = useCallback(() => {
     if (userId) {
       clinicalApi.getSurgeriesBySurgeon(userId).then(res => {
         setSurgeries(res.data);
-        // Fetch patient info for each surgery
         const uniquePatientIds = Array.from(new Set(res.data.map(s => s.patientId)));
         uniquePatientIds.forEach(id => {
           patientApi.getProfileById(id).then(pRes => {
@@ -187,6 +252,10 @@ export function DoctorSurgeries() {
       }).catch(console.error);
     }
   }, [userId]);
+
+  useEffect(() => {
+    fetchSurgeries();
+  }, [fetchSurgeries]);
 
   const upcomingSurgeries = useMemo(() => surgeries.filter(s => s.status !== "COMPLETED" && s.status !== "CANCELLED"), [surgeries]);
   const completedSurgeries = useMemo(() => surgeries.filter(s => s.status === "COMPLETED"), [surgeries]);
@@ -208,6 +277,20 @@ export function DoctorSurgeries() {
     return p && p.firstName && p.lastName ? `${p.firstName[0]}${p.lastName[0]}` : `P`;
   };
 
+  const handleUpdateStatus = async (surgery: SurgeryResponse) => {
+    const currentIdx = STEPS.indexOf(surgery.status);
+    if (currentIdx >= 0 && currentIdx < STEPS.length - 1) {
+      const nextStatus = STEPS[currentIdx + 1];
+      try {
+        await clinicalApi.updateSurgeryStatus(surgery.id, nextStatus);
+        toast.success(`Surgery status updated to ${nextStatus.replace("_", " ")}`);
+        fetchSurgeries();
+      } catch (err) {
+        toast.error(getApiErrorMessage(err, "Failed to update surgery status"));
+      }
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -221,10 +304,10 @@ export function DoctorSurgeries() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-7">
-        <StatCard title="Upcoming Surgeries" value={upcomingSurgeries.length.toString()} subtitle="Assigned to you" icon={<span className="text-[#0EA5E9]">🔪</span>} iconBg="bg-sky-50" />
-        <StatCard title="Completed Surgeries" value={completedSurgeries.length.toString()} subtitle="Total" icon={<span className="text-[#10B981]">✅</span>} iconBg="bg-emerald-50" />
-        <StatCard title="Next Surgery" value={upcomingSurgeries.length > 0 ? new Date(upcomingSurgeries[0].scheduledAt).toLocaleDateString() : "None"} subtitle={upcomingSurgeries.length > 0 ? upcomingSurgeries[0].surgeryType : ""} icon={<span className="text-[#F59E0B]">📅</span>} iconBg="bg-amber-50" />
-        <StatCard title="Total Surgeries" value={surgeries.length.toString()} subtitle="All time" icon={<span className="text-[#8B5CF6]">⏱</span>} iconBg="bg-purple-50" />
+        <StatCard title="Upcoming Surgeries" value={upcomingSurgeries.length.toString()} subtitle="Assigned to you" icon={<Scissors className="text-[#0EA5E9]" size={20} />} iconBg="bg-sky-50" />
+        <StatCard title="Completed Surgeries" value={completedSurgeries.length.toString()} subtitle="Total" icon={<CheckCircle2 className="text-[#10B981]" size={20} />} iconBg="bg-emerald-50" />
+        <StatCard title="Next Surgery" value={upcomingSurgeries.length > 0 ? new Date(upcomingSurgeries[0].scheduledAt).toLocaleDateString() : "None"} subtitle={upcomingSurgeries.length > 0 ? upcomingSurgeries[0].surgeryType : ""} icon={<CalendarClock className="text-[#F59E0B]" size={20} />} iconBg="bg-amber-50" />
+        <StatCard title="Total Surgeries" value={surgeries.length.toString()} subtitle="All time" icon={<Activity className="text-[#8B5CF6]" size={20} />} iconBg="bg-purple-50" />
       </div>
 
       <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-[#E2E8F0] mb-6 w-fit" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
@@ -256,8 +339,12 @@ export function DoctorSurgeries() {
               <StatusStepper currentStep={s.status} />
               <div className="flex gap-2 mt-4">
                 <button onClick={() => navigate(`/doctor/surgeries/${s.id}`)} className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0F172A] hover:bg-[#F8FAFC]">View Details</button>
-                <button className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0F172A] hover:bg-[#F8FAFC]">Add Pre-Op Notes</button>
-                <button className="px-3 py-1.5 rounded-lg bg-[#0EA5E9] text-white text-xs font-medium hover:opacity-90">Update Status</button>
+                <button 
+                  onClick={() => handleUpdateStatus(s)}
+                  className="px-3 py-1.5 rounded-lg bg-[#0EA5E9] text-white text-xs font-medium hover:opacity-90"
+                >
+                  Update Status to {STEPS.indexOf(s.status) < STEPS.length - 1 ? STEPS[STEPS.indexOf(s.status) + 1].replace("_", " ") : "Completed"}
+                </button>
               </div>
             </div>
           ))}
@@ -271,7 +358,7 @@ export function DoctorSurgeries() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                  {["Surgery Type", "Patient", "Date", "OR", "Outcome", "Notes"].map((h) => (
+                  {["Surgery Type", "Patient", "Date", "OR", "Outcome", "Actions"].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -287,7 +374,7 @@ export function DoctorSurgeries() {
                       <Badge variant={c.outcome === "SUCCESSFUL" ? "active" : "warning"}>{c.outcome || "N/A"}</Badge>
                     </td>
                     <td className="px-5 py-3.5">
-                      <button className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0EA5E9] hover:bg-[#F8FAFC]">View Notes</button>
+                      <button onClick={() => navigate(`/doctor/surgeries/${c.id}`)} className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0EA5E9] hover:bg-[#F8FAFC]">View Details</button>
                     </td>
                   </tr>
                 ))}
@@ -306,23 +393,26 @@ export function DoctorSurgeries() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                  {["Surgery Type", "Patient", "Date", "OR", "Status"].map((h) => (
+                  {["Surgery Type", "Patient", "Date", "OR", "Status", "Actions"].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {surgeries.map((c, i) => (
-                  <tr key={c.id} className={`border-b border-[#F1F5F9] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
+                  <tr key={c.id} className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
                     <td className="px-5 py-3.5 font-medium text-[#0F172A]">{c.surgeryType}</td>
                     <td className="px-5 py-3.5 text-[#64748B]">{getPatientName(c.patientId)}</td>
                     <td className="px-5 py-3.5 text-[#64748B]">{new Date(c.scheduledAt).toLocaleDateString()}</td>
                     <td className="px-5 py-3.5 text-[#64748B]">{c.operatingRoomName}</td>
                     <td className="px-5 py-3.5"><Badge variant={getStatusVariant(c.status) as any}>{c.status}</Badge></td>
+                    <td className="px-5 py-3.5">
+                      <button onClick={() => navigate(`/doctor/surgeries/${c.id}`)} className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0EA5E9] hover:bg-[#F8FAFC]">View Details</button>
+                    </td>
                   </tr>
                 ))}
                 {surgeries.length === 0 && (
-                  <tr><td colSpan={5} className="px-5 py-4 text-sm text-[#64748B] text-center">No surgeries.</td></tr>
+                  <tr><td colSpan={6} className="px-5 py-4 text-sm text-[#64748B] text-center">No surgeries.</td></tr>
                 )}
               </tbody>
             </table>
@@ -330,7 +420,7 @@ export function DoctorSurgeries() {
         </div>
       )}
 
-      {showModal && <ScheduleSurgeryModal onClose={() => setShowModal(false)} />}
+      {showModal && <ScheduleSurgeryModal onRefresh={fetchSurgeries} onClose={() => setShowModal(false)} />}
     </div>
   );
 }

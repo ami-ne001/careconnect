@@ -17,6 +17,8 @@ const navByRole: Record<string, NavItem[]> = {
   Admin: [
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/admin/dashboard" },
     { label: "User Management", icon: <Users size={18} />, path: "/admin/users-management" },
+    { label: "Doctor Schedules", icon: <Calendar size={18} />, path: "/admin/doctor-schedules" },
+    { label: "Wards & Rooms", icon: <Building2 size={18} />, path: "/admin/wards-rooms" },
     { label: "Departments", icon: <Building2 size={18} />, path: "/admin/departments" },
     { label: "Audit Logs", icon: <FileText size={18} />, path: "/admin/audit-logs" },
     { label: "Reports & Analytics", icon: <BarChart3 size={18} />, path: "/admin/reports" },
@@ -37,9 +39,7 @@ const navByRole: Record<string, NavItem[]> = {
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/nurse/dashboard" },
     { label: "Patients", icon: <Users size={18} />, path: "/nurse/patients" },
     { label: "Vitals Monitoring", icon: <HeartPulse size={18} />, path: "/nurse/vitals-monitoring" },
-    { label: "Medications", icon: <Pill size={18} />, path: "/nurse/medications" },
     { label: "Care Tasks", icon: <ClipboardList size={18} />, path: "/nurse/care-tasks" },
-    { label: "Appointments", icon: <Calendar size={18} />, path: "/nurse/appointments" },
   ],
   Receptionist: [
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/receptionist/dashboard" },
