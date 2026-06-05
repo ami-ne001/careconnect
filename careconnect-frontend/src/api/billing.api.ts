@@ -33,6 +33,12 @@ export interface InvoiceCreateRequest {
   notes?: string;
 }
 
+export interface InvoiceItemCreateRequest {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
 export interface PaymentCreateRequest {
   invoiceId: number;
   amount: number;
@@ -77,6 +83,12 @@ export const billingApi = {
 
   updateInvoiceStatus: (id: number, status: string) =>
     api.patch<InvoiceResponse>(`/api/billing/invoices/${id}/status`, { status }),
+
+  addItemToInvoice: (invoiceId: number, body: InvoiceItemCreateRequest) =>
+    api.post<InvoiceResponse>(`/api/billing/invoices/${invoiceId}/items`, body),
+
+  removeItemFromInvoice: (invoiceId: number, itemId: number) =>
+    api.delete<InvoiceResponse>(`/api/billing/invoices/${invoiceId}/items/${itemId}`),
 
   recordPayment: (body: PaymentCreateRequest) =>
     api.post<PaymentResponse>("/api/billing/payments", body),
