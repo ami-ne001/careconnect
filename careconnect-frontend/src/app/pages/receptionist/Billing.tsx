@@ -3,22 +3,30 @@ import { X, DollarSign, Clock, AlertCircle, CreditCard, Search } from "lucide-re
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { StatCard } from "../../components/ui/StatCard";
-import { billingApi, receptionistApi, adminApi } from "@/api";
+import { billingApi, receptionistApi, adminApi, clinicalApi } from "@/api";
 import { api } from "@/api/axios";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
 import type { InvoiceResponse } from "@/api/billing.api";
+import type { SurgeryResponse } from "@/api/clinical.api";
 import type { PatientProfileResponse, AdminUser } from "@/types";
 
 export function ReceptionistBilling() {
   const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
+  const [surgeries, setSurgeries] = useState<SurgeryResponse[]>([]);
   const [patients, setPatients] = useState<PatientProfileResponse[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search & Filter
   const [searchPatientId, setSearchPatientId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"All" | "Pending" | "Paid">("All");
+  const [activeTab, setActiveTab] = useState<"All" | "Pending" | "Paid" | "Surgeries">("All");
+
+  // Price Modal
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [selectedSurgery, setSelectedSurgery] = useState<SurgeryResponse | null>(null);
+  const [surgeryPrice, setSurgeryPrice] = useState<string>("");
+  const [settingPrice, setSettingPrice] = useState(false);
 
   // Payment Modal
   const [showModal, setShowModal] = useState(false);
@@ -41,14 +49,16 @@ export function ReceptionistBilling() {
     Promise.all([
       receptionistApi.getPatientsList(0, 100),
       adminApi.getUsers("PATIENT"),
-      billingApi.getAllInvoices()
+      billingApi.getAllInvoices(),
+      clinicalApi.getSurgeriesByStatus("COMPLETED")
     ])
-      .then(([ptsPage, ptsUsers, invoicesRes]) => {
+      .then(([ptsPage, ptsUsers, invoicesRes, surgeriesRes]) => {
         setPatients(ptsPage.data.content || []);
         setUsers(ptsUsers.data || []);
         // Sort by ID descending
         const allInvoices = [...invoicesRes.data].sort((a, b) => b.id - a.id);
         setInvoices(allInvoices);
+        setSurgeries(surgeriesRes.data || []);
       })
       .catch((err) => {
         console.error(err);
@@ -104,6 +114,28 @@ export function ReceptionistBilling() {
       toast.error(getApiErrorMessage(err, "Failed to process payment."));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSetSurgeryPrice = async () => {
+    if (!selectedSurgery) return;
+    const price = Number(surgeryPrice);
+    if (isNaN(price) || price <= 0) {
+      toast.error("Please enter a valid price.");
+      return;
+    }
+    setSettingPrice(true);
+    try {
+      await clinicalApi.setSurgeryPrice(selectedSurgery.id, price);
+      toast.success("Surgery price set & billed successfully!");
+      setShowPriceModal(false);
+      setSelectedSurgery(null);
+      setSurgeryPrice("");
+      loadData();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to set surgery price."));
+    } finally {
+      setSettingPrice(false);
     }
   };
 
@@ -175,7 +207,7 @@ export function ReceptionistBilling() {
           </div>
 
           <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-[#E2E8F0] mb-5 w-fit" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            {["All", "Pending", "Paid"].map((t) => (
+            {["All", "Pending", "Paid", "Surgeries"].map((t) => (
               <button
                 key={t}
                 onClick={() => setActiveTab(t as any)}
@@ -190,65 +222,116 @@ export function ReceptionistBilling() {
 
           <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                    {["Invoice ID", "Patient", "Description", "Due Date", "Total Amount", "Paid", "Status", "Actions"].map((h) => (
-                      <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="p-8 text-center text-[#64748B]">No invoices on record.</td>
+              {activeTab === "Surgeries" ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                      {["Surgery ID", "Patient", "Type", "Completed At", "Price", "Billing Status", "Actions"].map((h) => (
+                        <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold whitespace-nowrap">{h}</th>
+                      ))}
                     </tr>
-                  ) : (
-                    filteredInvoices.map((inv, i) => {
-                      const itemsSummary = inv.items.map(item => `${item.description} (x${item.quantity})`).join(", ");
-                      const dueDateStr = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "Immediate";
-
-                      return (
-                        <tr key={inv.id} className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] ${inv.status === "OVERDUE" ? "bg-red-50/40" : i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
-                          <td className="px-5 py-3.5 font-semibold text-[#0EA5E9] text-xs">INV-{inv.id}</td>
-                          <td className="px-5 py-3.5 font-bold text-[#0F172A]">{inv.patientName || `Patient ID: ${inv.patientId}`}</td>
-                          <td className="px-5 py-3.5 text-[#64748B] max-w-xs truncate" title={itemsSummary}>{itemsSummary || "Consultation & check-up"}</td>
-                          <td className="px-5 py-3.5 text-[#64748B]">{dueDateStr}</td>
-                          <td className="px-5 py-3.5 font-bold text-[#0F172A]">${inv.totalAmount.toFixed(2)}</td>
-                          <td className="px-5 py-3.5 font-semibold text-[#10B981]">${inv.paidAmount.toFixed(2)}</td>
-                          <td className="px-5 py-3.5">
-                            <Badge variant={getStatusBadgeVariant(inv.status)} dot>
-                              {inv.status}
-                            </Badge>
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setViewInvoice(inv)}
-                                className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#64748B] text-xs font-semibold hover:bg-[#F8FAFC] cursor-pointer"
-                              >
-                                View Details
-                              </button>
-                              {inv.status !== "PAID" && (
+                  </thead>
+                  <tbody>
+                    {surgeries.length === 0 ? (
+                      <tr><td colSpan={7} className="p-8 text-center text-[#64748B]">No completed surgeries pending billing.</td></tr>
+                    ) : (
+                      surgeries.map((s, i) => {
+                        const patient = patients.find(p => p.id === s.patientId);
+                        const patientName = patient ? getPatientDisplayName(patient) : `Patient #${s.patientId}`;
+                        const isBilled = s.price != null && s.price > 0;
+                        return (
+                          <tr key={s.id} className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
+                            <td className="px-5 py-3.5 font-semibold text-[#0EA5E9] text-xs">SRG-{s.id}</td>
+                            <td className="px-5 py-3.5 font-bold text-[#0F172A]">{patientName}</td>
+                            <td className="px-5 py-3.5 text-[#64748B]">{s.surgeryType}</td>
+                            <td className="px-5 py-3.5 text-[#64748B]">{s.actualEndAt ? new Date(s.actualEndAt).toLocaleDateString() : "—"}</td>
+                            <td className="px-5 py-3.5 font-bold text-[#0F172A]">{isBilled ? `$${s.price?.toFixed(2)}` : "—"}</td>
+                            <td className="px-5 py-3.5">
+                              <Badge variant={isBilled ? "completed" : "pending"}>
+                                {isBilled ? "BILLED" : "UNBILLED"}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              {!isBilled && (
                                 <button
                                   onClick={() => {
-                                    setSelectedInvoice(inv);
-                                    setAmountReceived((inv.totalAmount - inv.paidAmount).toFixed(2));
-                                    setShowModal(true);
+                                    setSelectedSurgery(s);
+                                    setSurgeryPrice("");
+                                    setShowPriceModal(true);
                                   }}
-                                  className="px-3 py-1.5 rounded-lg bg-[#1E3A5F] text-white text-xs font-bold hover:opacity-90 cursor-pointer"
+                                  className="px-3 py-1.5 rounded-lg bg-[#F59E0B] text-white text-xs font-bold hover:bg-[#D97706] cursor-pointer"
                                 >
-                                  Collect Payment
+                                  Enter Price & Bill
                                 </button>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                      {["Invoice ID", "Patient", "Description", "Due Date", "Total Amount", "Paid", "Status", "Actions"].map((h) => (
+                        <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-[#64748B]">No invoices on record.</td>
+                      </tr>
+                    ) : (
+                      filteredInvoices.map((inv, i) => {
+                        const itemsSummary = inv.items.map(item => `${item.description} (x${item.quantity})`).join(", ");
+                        const dueDateStr = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "Immediate";
+
+                        return (
+                          <tr key={inv.id} className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] ${inv.status === "OVERDUE" ? "bg-red-50/40" : i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
+                            <td className="px-5 py-3.5 font-semibold text-[#0EA5E9] text-xs">INV-{inv.id}</td>
+                            <td className="px-5 py-3.5 font-bold text-[#0F172A]">{inv.patientName || `Patient ID: ${inv.patientId}`}</td>
+                            <td className="px-5 py-3.5 text-[#64748B] max-w-xs truncate" title={itemsSummary}>{itemsSummary || "Consultation & check-up"}</td>
+                            <td className="px-5 py-3.5 text-[#64748B]">{dueDateStr}</td>
+                            <td className="px-5 py-3.5 font-bold text-[#0F172A]">${inv.totalAmount.toFixed(2)}</td>
+                            <td className="px-5 py-3.5 font-semibold text-[#10B981]">${inv.paidAmount.toFixed(2)}</td>
+                            <td className="px-5 py-3.5">
+                              <Badge variant={getStatusBadgeVariant(inv.status)} dot>
+                                {inv.status}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setViewInvoice(inv)}
+                                  className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#64748B] text-xs font-semibold hover:bg-[#F8FAFC] cursor-pointer"
+                                >
+                                  View Details
+                                </button>
+                                {inv.status !== "PAID" && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedInvoice(inv);
+                                      setAmountReceived((inv.totalAmount - inv.paidAmount).toFixed(2));
+                                      setShowModal(true);
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg bg-[#1E3A5F] text-white text-xs font-bold hover:opacity-90 cursor-pointer"
+                                  >
+                                    Collect Payment
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </>
@@ -310,6 +393,51 @@ export function ReceptionistBilling() {
                 >
                   {submitting && <span className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />}
                   Record Payment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Surgery Price Modal */}
+      {showPriceModal && selectedSurgery && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-[#0F172A] text-base">Bill Surgery</h3>
+              <button className="cursor-pointer" onClick={() => setShowPriceModal(false)}><X size={18} className="text-[#64748B]" /></button>
+            </div>
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 mb-5 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-[#64748B]">Surgery ID:</span>
+                <span className="font-semibold text-[#0F172A]">SRG-{selectedSurgery.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#64748B]">Type:</span>
+                <span className="font-semibold text-[#0F172A]">{selectedSurgery.surgeryType}</span>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Surgery Price</label>
+                <input
+                  type="number"
+                  value={surgeryPrice}
+                  onChange={(e) => setSurgeryPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full h-11 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] font-bold"
+                />
+              </div>
+              <div className="flex gap-3 pt-3">
+                <button onClick={() => setShowPriceModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#64748B] cursor-pointer">Cancel</button>
+                <button
+                  onClick={handleSetSurgeryPrice}
+                  disabled={settingPrice}
+                  className="flex-1 h-10 rounded-lg bg-[#F59E0B] text-white text-xs font-bold hover:bg-[#D97706] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {settingPrice && <span className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />}
+                  Bill Patient
                 </button>
               </div>
             </div>
