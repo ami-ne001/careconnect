@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Users, UserCheck, Server, DollarSign, Plus, Building2, FileText, BarChart2, Database, HardDrive, Wifi, Clock } from "lucide-react";
+import { Users, UserCheck, DollarSign, Plus, Building2, FileText, BarChart2, Database, HardDrive, Wifi, Clock } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { StatCard } from "../../components/ui/StatCard";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -191,7 +191,7 @@ export function AdminDashboard() {
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5 mb-7">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-7">
         <StatCard
           title="Total Staff"
           value={metricsLoading ? "—" : totalStaff.toLocaleString()}
@@ -205,13 +205,6 @@ export function AdminDashboard() {
           subtitle="Currently admitted"
           icon={<UserCheck size={20} className="text-[#10B981]" />}
           iconBg="bg-emerald-50"
-        />
-        <StatCard
-          title="System Uptime"
-          value={metricsLoading ? "—" : "N/A"}
-          subtitle="Not available via metrics API"
-          icon={<Server size={20} className="text-[#0EA5E9]" />}
-          iconBg="bg-sky-50"
         />
         <StatCard
           title="Monthly Revenue"
