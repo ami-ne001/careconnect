@@ -6,6 +6,7 @@ import { appointmentApi, receptionistApi } from "@/api";
 import { adminApi } from "@/api/admin.api";
 import { clinicalApi } from "@/api/clinical.api";
 import { labApi } from "@/api/lab.api";
+import { billingApi } from "@/api/billing.api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -140,6 +141,40 @@ export function DoctorConsultations() {
         priority: labPriority,
       });
       setLabRequests((prev) => [...prev, data]);
+
+      // ── Bill the lab test fee ───────────────────────────────────────
+      const testTypeName = testTypes.find((t) => t.id === Number(selectedTestTypeId))?.name ?? "Lab Test";
+      try {
+        const { data: patientInvoices } = await billingApi.getInvoicesByPatient(activeAppt.patientId);
+        const openInvoice = patientInvoices.find(
+          (inv) =>
+            inv.consultationId === consultation.id &&
+            inv.status !== "PAID" &&
+            inv.status !== "CANCELLED"
+        );
+        if (openInvoice) {
+          await billingApi.addItemToInvoice(openInvoice.id, {
+            description: `Lab Test: ${testTypeName}`,
+            quantity: 1,
+            unitPrice: 35,
+          });
+        } else {
+          const { data: newInv } = await billingApi.createInvoice({
+            patientId: activeAppt.patientId,
+            consultationId: consultation.id,
+            notes: `Lab charges for consultation #${consultation.id}`,
+          });
+          await billingApi.addItemToInvoice(newInv.id, {
+            description: `Lab Test: ${testTypeName}`,
+            quantity: 1,
+            unitPrice: 35,
+          });
+        }
+      } catch (billingErr) {
+        console.warn("Lab billing charge failed (non-fatal):", billingErr);
+      }
+      // ───────────────────────────────────────────────────────────────
+
       setSelectedTestTypeId("");
       setLabPriority("NORMAL");
       toast.success("Lab test requested successfully.");
@@ -166,7 +201,25 @@ export function DoctorConsultations() {
         admissionReason: admitForm.admissionReason || undefined,
         diagnosis: admitForm.diagnosis || diagnosis || undefined,
       };
-      await receptionistApi.admitPatient(body);
+      const { data: admissionData } = await receptionistApi.admitPatient(body);
+
+      // ── Bill the admission upfront ──────────────────────────────────
+      try {
+        const { data: newInv } = await billingApi.createInvoice({
+          patientId: activeAppt.patientId,
+          admissionId: admissionData.id,
+          notes: `Admission #${admissionData.id} — ${admitForm.admissionReason || "Hospital Admission"}`,
+        });
+        await billingApi.addItemToInvoice(newInv.id, {
+          description: "Hospital Admission — Room Reservation",
+          quantity: 1,
+          unitPrice: 150,
+        });
+      } catch (billingErr) {
+        console.warn("Admission billing charge failed (non-fatal):", billingErr);
+      }
+      // ───────────────────────────────────────────────────────────────
+
       toast.success("Patient admitted successfully.");
       setAdmitDone(true);
     } catch (err) {

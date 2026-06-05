@@ -4,6 +4,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { StatCard } from "../../components/ui/StatCard";
 import { receptionistApi, adminApi } from "@/api";
+import { billingApi } from "@/api/billing.api";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
 import type { AdmissionResponse, RoomResponse, WardResponse } from "@/api/receptionist.api";
@@ -100,7 +101,7 @@ export function AdmissionsManagement() {
     }
     setSubmitting(true);
     try {
-      await receptionistApi.admitPatient({
+      const { data: admissionData } = await receptionistApi.admitPatient({
         patientId: Number(selectedPatientId),
         admittingDoctorId: Number(admittingDoctorId),
         roomId: Number(selectedRoomId),
@@ -109,6 +110,23 @@ export function AdmissionsManagement() {
         diagnosis: diagnosis.trim() || undefined,
         expectedDischargeDate: expectedDischarge || undefined,
       });
+
+      // ── Bill the admission upfront ──────────────────────────────────
+      try {
+        const { data: newInv } = await billingApi.createInvoice({
+          patientId: Number(selectedPatientId),
+          admissionId: admissionData.id,
+          notes: `Admission #${admissionData.id} — ${admissionReason || "Hospital Admission"}`,
+        });
+        await billingApi.addItemToInvoice(newInv.id, {
+          description: "Hospital Admission — Room Reservation",
+          quantity: 1,
+          unitPrice: 150,
+        });
+      } catch (billingErr) {
+        console.warn("Admission billing charge failed (non-fatal):", billingErr);
+      }
+      // ───────────────────────────────────────────────────────────────
 
       toast.success("Patient admitted successfully!");
       setShowAdmitModal(false);

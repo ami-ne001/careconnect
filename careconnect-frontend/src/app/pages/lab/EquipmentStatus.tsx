@@ -33,10 +33,12 @@ export function LabEquipmentStatus() {
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showResolveModal, setShowResolveModal] = useState(false);
   
   // Forms
   const [eqForm, setEqForm] = useState({ name: "", type: "", serialNumber: "", lastCalibrated: "", nextCalibration: "", notes: "" });
   const [issueForm, setIssueForm] = useState({ equipmentId: "", issue: "" });
+  const [resolveForm, setResolveForm] = useState({ maintenanceId: 0, resolution: "" });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -121,6 +123,26 @@ export function LabEquipmentStatus() {
     }
   };
 
+  const handleResolveIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resolveForm.maintenanceId || !resolveForm.resolution) return;
+    setSubmitting(true);
+    try {
+      await labApi.resolveMaintenance(resolveForm.maintenanceId, {
+        status: "RESOLVED",
+        resolution: resolveForm.resolution,
+      });
+      toast.success("Maintenance resolved successfully");
+      setShowResolveModal(false);
+      setResolveForm({ maintenanceId: 0, resolution: "" });
+      loadEquipment();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to resolve maintenance"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -167,18 +189,32 @@ export function LabEquipmentStatus() {
                       </span>
                     </div>
                   </div>
-                  {eq.status !== "OPERATIONAL" && (
-                    <button 
-                      onClick={() => {
-                        const latestIssue = maintenanceLog.find(l => l.equipmentId === eq.id && l.status !== "RESOLVED");
-                        if (latestIssue) {
-                           toast.info(`Current Issue: ${latestIssue.issue}`);
-                        }
-                      }}
-                      className="mt-4 w-full h-8 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5 cursor-pointer">
-                      <AlertTriangle size={12} />View Issue
-                    </button>
-                  )}
+                  {eq.status !== "OPERATIONAL" && (() => {
+                    const latestIssue = maintenanceLog.find(l => l.equipmentId === eq.id && l.status !== "RESOLVED");
+                    return (
+                      <div className="mt-4 flex gap-2">
+                        <button 
+                          onClick={() => {
+                            if (latestIssue) {
+                              toast.info(`Current Issue: ${latestIssue.issue}`);
+                            }
+                          }}
+                          className="flex-1 h-8 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] flex items-center justify-center gap-1.5 cursor-pointer">
+                          <AlertTriangle size={12} />View
+                        </button>
+                        {latestIssue && (
+                          <button 
+                            onClick={() => {
+                              setResolveForm({ maintenanceId: latestIssue.id, resolution: "" });
+                              setShowResolveModal(true);
+                            }}
+                            className="flex-1 h-8 rounded-lg bg-[#10B981] text-white text-xs font-medium hover:bg-[#059669] flex items-center justify-center gap-1.5 cursor-pointer">
+                            <CheckCircle size={12} />Resolve
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -290,6 +326,28 @@ export function LabEquipmentStatus() {
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowIssueModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B]">Cancel</button>
                 <button type="submit" disabled={submitting} className="flex-1 h-10 rounded-lg bg-[#EF4444] text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50">Report</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Resolve Issue Modal */}
+      {showResolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-bold text-[#0F172A]">Resolve Maintenance</h3>
+              <button onClick={() => setShowResolveModal(false)}><X size={18} className="text-[#64748B]" /></button>
+            </div>
+            <form onSubmit={handleResolveIssue} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Resolution Details <span className="text-red-500">*</span></label>
+                <textarea required rows={4} value={resolveForm.resolution} onChange={e => setResolveForm({...resolveForm, resolution: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#10B981]" placeholder="Describe how the issue was fixed..." />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowResolveModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B]">Cancel</button>
+                <button type="submit" disabled={submitting} className="flex-1 h-10 rounded-lg bg-[#10B981] text-white text-sm font-semibold hover:bg-[#059669] disabled:opacity-50">Resolve</button>
               </div>
             </form>
           </div>
