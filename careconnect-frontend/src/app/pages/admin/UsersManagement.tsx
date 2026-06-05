@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
-import { Search, Plus, X, Edit2, ShieldAlert, Check } from "lucide-react";
+import { Search, Plus, X, Edit2, ShieldAlert, Stethoscope } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
-import { adminApi } from "@/api";
+import { adminApi, clinicalApi } from "@/api";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { toast } from "sonner";
 import type { AdminUser, Department, UserCreateRequest, UserRole, UserUpdateRequest } from "@/types";
+import type { DoctorProfileUpdateRequest } from "@/api/clinical.api";
 
 const ALL_ROLES_FILTER = "" as const;
-const ROLE_OPTIONS = [
+
+// Roles admin can CREATE
+const CREATABLE_ROLES = [
+  { label: "Admin", value: "ADMIN" },
+  { label: "Doctor", value: "DOCTOR" },
+  { label: "Nurse", value: "NURSE" },
+  { label: "Receptionist", value: "RECEPTIONIST" },
+  { label: "Lab Technician", value: "LAB_TECHNICIAN" },
+];
+
+// Roles available in the filter (all, including patient for viewing)
+const ALL_ROLE_FILTER_OPTIONS = [
   { label: "Admin", value: "ADMIN" },
   { label: "Doctor", value: "DOCTOR" },
   { label: "Nurse", value: "NURSE" },
@@ -30,7 +42,7 @@ export function AdminUsers() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [formLoading, setFormLoading] = useState(false);
 
-  // Form Fields
+  // Basic user fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -41,6 +53,13 @@ export function AdminUsers() {
   const [gender, setGender] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [address, setAddress] = useState("");
+
+  // Doctor profile fields
+  const [specialty, setSpecialty] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [yearsExperience, setYearsExperience] = useState("");
+  const [bio, setBio] = useState("");
+  const [isSurgeon, setIsSurgeon] = useState(false);
 
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
@@ -75,9 +94,7 @@ export function AdminUsers() {
     loadUsers(roleFilter || undefined);
   }, [roleFilter, loadUsers]);
 
-  const openCreate = () => {
-    setFormMode("create");
-    setSelectedUser(null);
+  const resetForm = () => {
     setFirstName("");
     setLastName("");
     setEmail("");
@@ -88,10 +105,21 @@ export function AdminUsers() {
     setGender("");
     setDateOfBirth("");
     setAddress("");
+    setSpecialty("");
+    setLicenseNumber("");
+    setYearsExperience("");
+    setBio("");
+    setIsSurgeon(false);
+  };
+
+  const openCreate = () => {
+    setFormMode("create");
+    setSelectedUser(null);
+    resetForm();
     setFormOpen(true);
   };
 
-  const openEdit = (user: AdminUser) => {
+  const openEdit = async (user: AdminUser) => {
     setFormMode("edit");
     setSelectedUser(user);
     setFirstName(user.firstName);
@@ -104,6 +132,28 @@ export function AdminUsers() {
     setGender(user.gender || "");
     setDateOfBirth(user.dateOfBirth || "");
     setAddress(user.address || "");
+
+    // Reset doctor profile fields
+    setSpecialty("");
+    setLicenseNumber("");
+    setYearsExperience("");
+    setBio("");
+    setIsSurgeon(false);
+
+    // If doctor, fetch the doctor profile
+    if (user.role === "DOCTOR") {
+      try {
+        const { data: dp } = await clinicalApi.getDoctorProfile(user.id);
+        setSpecialty(dp.specialty || "");
+        setLicenseNumber(dp.licenseNumber || "");
+        setYearsExperience(dp.yearsExperience != null ? String(dp.yearsExperience) : "");
+        setBio(dp.bio || "");
+        setIsSurgeon(dp.isSurgeon || false);
+      } catch {
+        // Profile may not exist yet, that's fine
+      }
+    }
+
     setFormOpen(true);
   };
 
@@ -123,6 +173,8 @@ export function AdminUsers() {
     };
 
     try {
+      let savedUserId: number | undefined;
+
       if (formMode === "create") {
         if (!email.trim() || !password.trim()) {
           toast.error("Email and Password are required for new users.");
@@ -134,13 +186,29 @@ export function AdminUsers() {
           email: email.trim(),
           password: password.trim(),
         };
-        await adminApi.createUser(body);
-        toast.success("User created successfully!");
+        const { data: newUser } = await adminApi.createUser(body);
+        savedUserId = newUser.id;
+        toast.success("User account created successfully!");
       } else if (selectedUser) {
         const body: UserUpdateRequest = commonData;
         await adminApi.updateUser(selectedUser.id, body);
+        savedUserId = selectedUser.id;
         toast.success("User updated successfully!");
       }
+
+      // If role is DOCTOR, also create/update the doctor profile
+      if (role === "DOCTOR" && savedUserId) {
+        const doctorProfileData: DoctorProfileUpdateRequest = {
+          isSurgeon,
+          specialty: specialty.trim() || undefined,
+          licenseNumber: licenseNumber.trim() || undefined,
+          yearsExperience: yearsExperience ? Number(yearsExperience) : undefined,
+          bio: bio.trim() || undefined,
+        };
+        await clinicalApi.updateDoctorProfile(savedUserId, doctorProfileData);
+        toast.success("Doctor profile saved.");
+      }
+
       setFormOpen(false);
       await loadUsers(roleFilter || undefined);
     } catch (err) {
@@ -209,7 +277,7 @@ export function AdminUsers() {
           className="h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm text-[#0F172A] bg-white outline-none focus:ring-2 focus:ring-[#0EA5E9]"
         >
           <option value={ALL_ROLES_FILTER}>All Roles</option>
-          {ROLE_OPTIONS.map((r) => (
+          {ALL_ROLE_FILTER_OPTIONS.map((r) => (
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}
         </select>
@@ -270,12 +338,15 @@ export function AdminUsers() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEdit(u)}
-                            className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0F172A] hover:bg-[#F0F4F8] transition-colors cursor-pointer"
-                          >
-                            Edit
-                          </button>
+                          {/* Patients can't be edited from here */}
+                          {u.role !== "PATIENT" && (
+                            <button
+                              onClick={() => openEdit(u)}
+                              className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0F172A] hover:bg-[#F0F4F8] transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <Edit2 size={12} /> Edit
+                            </button>
+                          )}
                           {u.isActive && (
                             <button
                               onClick={() => {
@@ -298,19 +369,29 @@ export function AdminUsers() {
         </div>
       </div>
 
-      {/* Edit/Create slide-over */}
+      {/* Create / Edit slide-over */}
       {formOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="flex-1 bg-black/35 backdrop-blur-xs" onClick={() => !formLoading && setFormOpen(false)} />
-          <div className="w-96 bg-white h-full shadow-2xl flex flex-col">
+          <div className="w-[440px] bg-white h-full shadow-2xl flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
-              <h3 className="font-semibold text-[#0F172A]">{formMode === "create" ? "Add New User" : "Edit User"}</h3>
+              <div>
+                <h3 className="font-semibold text-[#0F172A]">{formMode === "create" ? "Add New Staff Member" : "Edit Staff Member"}</h3>
+                {role === "DOCTOR" && (
+                  <p className="text-xs text-[#0EA5E9] flex items-center gap-1 mt-0.5">
+                    <Stethoscope size={11} /> Includes doctor profile fields
+                  </p>
+                )}
+              </div>
               <button disabled={formLoading} onClick={() => setFormOpen(false)} className="cursor-pointer">
                 <X size={18} className="text-[#64748B]" />
               </button>
             </div>
             <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
+
+                {/* ── Account Info ── */}
+                <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest">Account Information</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-[#0F172A] mb-1">First Name</label>
@@ -362,9 +443,10 @@ export function AdminUsers() {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
-                    className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                    disabled={formMode === "edit"}
+                    className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]"
                   >
-                    {ROLE_OPTIONS.map((r) => (
+                    {CREATABLE_ROLES.map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
@@ -426,6 +508,74 @@ export function AdminUsers() {
                     className="w-full p-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
                   />
                 </div>
+
+                {/* ── Doctor Profile ── */}
+                {role === "DOCTOR" && (
+                  <>
+                    <div className="border-t border-[#E2E8F0] pt-4">
+                      <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                        <Stethoscope size={12} className="text-[#0EA5E9]" /> Doctor Profile
+                      </p>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-medium text-[#0F172A] mb-1">Specialty</label>
+                          <input
+                            value={specialty}
+                            onChange={(e) => setSpecialty(e.target.value)}
+                            placeholder="e.g. Cardiology, Pediatrics"
+                            className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-[#0F172A] mb-1">License Number</label>
+                          <input
+                            value={licenseNumber}
+                            onChange={(e) => setLicenseNumber(e.target.value)}
+                            placeholder="Medical license number"
+                            className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-[#0F172A] mb-1">Years of Experience</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={60}
+                            value={yearsExperience}
+                            onChange={(e) => setYearsExperience(e.target.value)}
+                            placeholder="e.g. 8"
+                            className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-[#0F172A] mb-1">Bio / Notes</label>
+                          <textarea
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            rows={3}
+                            placeholder="Short professional biography..."
+                            className="w-full p-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                          />
+                        </div>
+
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                          <div
+                            onClick={() => setIsSurgeon(!isSurgeon)}
+                            className={`w-10 h-5 rounded-full transition-colors relative ${isSurgeon ? "bg-[#0EA5E9]" : "bg-[#CBD5E1]"}`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isSurgeon ? "translate-x-5" : "translate-x-0.5"}`} />
+                          </div>
+                          <span className="text-sm font-medium text-[#0F172A]">Qualified Surgeon</span>
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
               </div>
 
               <div className="px-6 py-4 border-t border-[#E2E8F0] flex gap-3">

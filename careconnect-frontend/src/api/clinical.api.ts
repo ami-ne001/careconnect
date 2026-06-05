@@ -253,7 +253,25 @@ export interface PrescriptionCreateRequest {
   items: PrescriptionItemDto[];
 }
 
-// ── Misc ──────────────────────────────────────────────────────────
+// ── Doctor Profile ─────────────────────────────────────────────
+export interface DoctorProfileResponse {
+  id: number;
+  userId: number;
+  isSurgeon: boolean;
+  specialty?: string;
+  licenseNumber?: string;
+  yearsExperience?: number;
+  bio?: string;
+}
+
+export interface DoctorProfileUpdateRequest {
+  isSurgeon?: boolean;
+  specialty?: string;
+  licenseNumber?: string;
+  yearsExperience?: number;
+  bio?: string;
+}
+
 export interface MedicalDocumentCreateRequest {
   patientId: number;
   documentType: string;
@@ -364,4 +382,11 @@ export const clinicalApi = {
 
   updateSurgeryStatus: (id: number, status: string) =>
     api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}`, { status }),
+
+  // Doctor Profiles
+  getDoctorProfile: (userId: number) =>
+    api.get<DoctorProfileResponse>(`/api/clinical/doctors/${userId}`),
+
+  updateDoctorProfile: (userId: number, body: DoctorProfileUpdateRequest) =>
+    api.put<DoctorProfileResponse>(`/api/clinical/doctors/${userId}`, body),
 };
