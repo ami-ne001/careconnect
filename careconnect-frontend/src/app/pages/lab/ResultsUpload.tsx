@@ -101,7 +101,7 @@ export function LabResultsUpload() {
       if (referenceRanges.length > 0) {
         finalData = JSON.stringify(resultValues, null, 2);
       } else {
-        finalData = unstructuredData;
+        finalData = JSON.stringify({ notes: unstructuredData });
       }
 
       await labApi.uploadResult({

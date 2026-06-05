@@ -44,9 +44,15 @@ public class AdminUserController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean isAdminOrReceptionist = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_RECEPTIONIST"));
-        if (!isAdminOrReceptionist && role != Role.DOCTOR) {
+        boolean isDoctor = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_DOCTOR"));
+        if (!isAdminOrReceptionist && !isDoctor && role != Role.DOCTOR) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Non-admin/receptionist users can only view DOCTOR profiles");
+        }
+        if (isDoctor && !isAdminOrReceptionist && role != Role.DOCTOR && role != Role.NURSE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Doctors can only view DOCTOR and NURSE profiles");
         }
         return ResponseEntity.ok(adminUserService.getAllUsers(role));
     }

@@ -1,5 +1,68 @@
 import { api } from "./axios";
 
+export interface CareTaskCreateRequest {
+  patientId: number;
+  assignedTo: number;
+  surgeryId?: number;
+  admissionId?: number;
+  title: string;
+  description?: string;
+  priority?: string; // NORMAL | URGENT | CRITICAL
+  dueAt?: string;
+}
+
+export interface CareTaskResponse {
+  id: number;
+  patientId: number;
+  assignedTo: number;
+  surgeryId?: number;
+  admissionId?: number;
+  title: string;
+  description?: string;
+  priority: string;
+  status: string;
+  dueAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SurgeryCreateRequest {
+  patientId: number;
+  leadSurgeonId: number;
+  assistingSurgeonId?: number;
+  assistingNurseId?: number;
+  operatingRoomId: number;
+  admissionId?: number;
+  surgeryType: string;
+  priority?: string;
+  scheduledAt: string;
+  estimatedDuration: number;
+}
+
+export interface SurgeryResponse {
+  id: number;
+  patientId: number;
+  leadSurgeonId: number;
+  assistingSurgeonId?: number;
+  assistingNurseId?: number;
+  operatingRoomId: number;
+  operatingRoomName: string;
+  admissionId?: number;
+  surgeryType: string;
+  priority: string;
+  status: string;
+  scheduledAt: string;
+  estimatedDuration: number;
+  actualStartAt?: string;
+  actualEndAt?: string;
+  preOpNotes?: string;
+  postOpNotes?: string;
+  outcome?: string;
+  specialEquipment?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AuditActivityResponse {
   id: number;
   userId: number | null;
@@ -191,6 +254,14 @@ export interface PrescriptionCreateRequest {
 }
 
 // ── Misc ──────────────────────────────────────────────────────────
+export interface MedicalDocumentCreateRequest {
+  patientId: number;
+  documentType: string;
+  title: string;
+  fileUrl: string;
+  notes?: string;
+}
+
 export interface MedicalDocumentResponse {
   id: number;
   patientId: number;
@@ -240,6 +311,9 @@ export const clinicalApi = {
     api.put<PrescriptionResponse>(`/api/clinical/prescriptions/${id}/cancel`),
 
   // Documents
+  uploadDocument: (body: MedicalDocumentCreateRequest) =>
+    api.post<MedicalDocumentResponse>("/api/documents", body),
+
   getDocumentsByPatient: (patientId: number) =>
     api.get<MedicalDocumentResponse[]>(`/api/documents/patient/${patientId}`),
 
@@ -270,4 +344,24 @@ export const clinicalApi = {
       status,
       notes: notes ?? "",
     }),
+
+  // Care Tasks
+  createCareTask: (body: CareTaskCreateRequest) =>
+    api.post<CareTaskResponse>("/api/clinical/care-tasks", body),
+
+  getCareTasksAssignedTo: (nurseId: number) =>
+    api.get<CareTaskResponse[]>(`/api/clinical/care-tasks/nurse/${nurseId}`),
+
+  updateCareTaskStatus: (id: number, status: string) =>
+    api.put<CareTaskResponse>(`/api/clinical/care-tasks/${id}/status`, { status }),
+
+  // Surgeries
+  createSurgery: (body: SurgeryCreateRequest) =>
+    api.post<SurgeryResponse>("/api/clinical/surgeries", body),
+
+  getSurgeriesBySurgeon: (surgeonId: number) =>
+    api.get<SurgeryResponse[]>(`/api/clinical/surgeries/surgeon/${surgeonId}`),
+
+  updateSurgeryStatus: (id: number, status: string) =>
+    api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}`, { status }),
 };

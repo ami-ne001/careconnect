@@ -1,18 +1,24 @@
 import { useState, useEffect, useRef } from "react";
-import { Stethoscope, FlaskConical, Pill, CheckCircle, RefreshCw, Plus, X, ChevronDown, TestTube, AlertTriangle } from "lucide-react";
+import { Stethoscope, FlaskConical, Pill, CheckCircle, RefreshCw, Plus, X, ChevronDown, TestTube, AlertTriangle, BedDouble, Scissors, UserCheck, ClipboardList } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { appointmentApi, receptionistApi } from "@/api";
+import { adminApi } from "@/api/admin.api";
 import { clinicalApi } from "@/api/clinical.api";
 import { labApi } from "@/api/lab.api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
 import type { AppointmentResponse, QueueResponse } from "@/api/appointment.api";
+import type { RoomResponse, WardResponse, AdmissionCreateRequest } from "@/api/receptionist.api";
+import type { AdminUser } from "@/types";
 import type {
   ConsultationResponse,
   VitalsCreateRequest,
   PrescriptionItemDto,
+  SurgeryCreateRequest,
+  CareTaskCreateRequest,
+  OperatingRoomResponse,
 } from "@/api/clinical.api";
 import type { LabTestTypeResponse, LabRequestResponse } from "@/api/lab.api";
 
@@ -69,11 +75,45 @@ export function DoctorConsultations() {
   const [labPriority, setLabPriority] = useState<"NORMAL" | "URGENT" | "CRITICAL">("NORMAL");
   const [submittingLab, setSubmittingLab] = useState(false);
 
+  // ── Admit Patient ─────────────────────────────────────────────
+  const [showAdmit, setShowAdmit] = useState(false);
+  const [wards, setWards] = useState<WardResponse[]>([]);
+  const [rooms, setRooms] = useState<RoomResponse[]>([]);
+  const [admitForm, setAdmitForm] = useState({ roomId: "", bedNumber: "1", admissionReason: "", diagnosis: "" });
+  const [submittingAdmit, setSubmittingAdmit] = useState(false);
+  const [admitDone, setAdmitDone] = useState(false);
+
+  // ── Schedule Surgery ──────────────────────────────────────────
+  const [showSurgery, setShowSurgery] = useState(false);
+  const [operatingRooms, setOperatingRooms] = useState<OperatingRoomResponse[]>([]);
+  const [surgeryForm, setSurgeryForm] = useState({
+    surgeryType: "", operatingRoomId: "", scheduledAt: "", estimatedDuration: "60",
+    priority: "NORMAL", preOpNotes: "",
+  });
+  const [submittingSurgery, setSubmittingSurgery] = useState(false);
+  const [surgeryDone, setSurgeryDone] = useState(false);
+
+  // ── Assign Nurse / Care Tasks ─────────────────────────────────
+  const [showCare, setShowCare] = useState(false);
+  const [nurses, setNurses] = useState<AdminUser[]>([]);
+  const [selectedNurseId, setSelectedNurseId] = useState<number | "">("");
+  const [careTasks, setCareTasks] = useState<{ title: string; description: string; priority: string }[]>([]);
+  const [submittingCare, setSubmittingCare] = useState(false);
+  const [careTasksDone, setCareTasksDone] = useState<{ title: string; nurseId: number }[]>([]);
+
   // ── Load lab test types once ──────────────────────────────────
   useEffect(() => {
     labApi.getAllTestTypes()
       .then(({ data }) => setTestTypes(data || []))
       .catch(() => { /* silent */ });
+  }, []);
+
+  // ── Load wards / rooms / operating rooms / nurses once ────────
+  useEffect(() => {
+    receptionistApi.getWards().then(({ data }) => setWards(data || [])).catch(() => {});
+    receptionistApi.getAvailableRooms().then(({ data }) => setRooms(data || [])).catch(() => {});
+    clinicalApi.getOperatingRooms().then(({ data }) => setOperatingRooms(data || [])).catch(() => {});
+    adminApi.getUsers("NURSE" as any).then(({ data }) => setNurses((data || []).filter(n => n.isActive))).catch(() => {});
   }, []);
 
   // ── Load existing lab requests for a consultation ─────────────
@@ -107,6 +147,93 @@ export function DoctorConsultations() {
       toast.error(getApiErrorMessage(err, "Failed to submit lab request."));
     } finally {
       setSubmittingLab(false);
+    }
+  };
+
+  // ── Admit patient handler ─────────────────────────────────────
+  const submitAdmission = async () => {
+    if (!activeAppt || !userId || !admitForm.roomId) {
+      toast.error("Please select a room.");
+      return;
+    }
+    setSubmittingAdmit(true);
+    try {
+      const body: AdmissionCreateRequest = {
+        patientId: activeAppt.patientId,
+        admittingDoctorId: userId,
+        roomId: Number(admitForm.roomId),
+        bedNumber: Number(admitForm.bedNumber) || 1,
+        admissionReason: admitForm.admissionReason || undefined,
+        diagnosis: admitForm.diagnosis || diagnosis || undefined,
+      };
+      await receptionistApi.admitPatient(body);
+      toast.success("Patient admitted successfully.");
+      setAdmitDone(true);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to admit patient."));
+    } finally {
+      setSubmittingAdmit(false);
+    }
+  };
+
+  // ── Schedule surgery handler ──────────────────────────────────
+  const submitSurgery = async () => {
+    if (!activeAppt || !userId) return;
+    if (!surgeryForm.surgeryType || !surgeryForm.operatingRoomId || !surgeryForm.scheduledAt) {
+      toast.error("Please fill in surgery type, operating room, and scheduled time.");
+      return;
+    }
+    setSubmittingSurgery(true);
+    try {
+      const body: SurgeryCreateRequest = {
+        patientId: activeAppt.patientId,
+        leadSurgeonId: userId,
+        operatingRoomId: Number(surgeryForm.operatingRoomId),
+        surgeryType: surgeryForm.surgeryType,
+        priority: surgeryForm.priority,
+        scheduledAt: surgeryForm.scheduledAt,
+        estimatedDuration: Number(surgeryForm.estimatedDuration) || 60,
+      };
+      await clinicalApi.createSurgery(body);
+      toast.success("Surgery scheduled successfully.");
+      setSurgeryDone(true);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to schedule surgery."));
+    } finally {
+      setSubmittingSurgery(false);
+    }
+  };
+
+  // ── Submit care tasks handler ─────────────────────────────────
+  const submitCareTasks = async () => {
+    if (!activeAppt || !selectedNurseId) {
+      toast.error("Please select a nurse.");
+      return;
+    }
+    const validTasks = careTasks.filter(t => t.title.trim());
+    if (validTasks.length === 0) {
+      toast.error("Please add at least one task.");
+      return;
+    }
+    setSubmittingCare(true);
+    try {
+      for (const task of validTasks) {
+        const body: CareTaskCreateRequest = {
+          patientId: activeAppt.patientId,
+          assignedTo: Number(selectedNurseId),
+          title: task.title,
+          description: task.description || undefined,
+          priority: task.priority || "NORMAL",
+        };
+        await clinicalApi.createCareTask(body);
+        setCareTasksDone(prev => [...prev, { title: task.title, nurseId: Number(selectedNurseId) }]);
+      }
+      setCareTasks([]);
+      toast.success(`${validTasks.length} care task(s) assigned successfully.`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to create care tasks."));
+    } finally {
+      setSubmittingCare(false);
     }
   };
 
@@ -160,6 +287,13 @@ export function DoctorConsultations() {
     setClinicalNotes("");
     setShowVitals(false);
     setShowRx(false);
+    setShowLab(false);
+    setShowAdmit(false);
+    setShowSurgery(false);
+    setShowCare(false);
+    setAdmitDone(false);
+    setSurgeryDone(false);
+    setCareTasksDone([]);
 
     const appt = appointments.find((a) => a.id === qe.appointmentId) || null;
     setActiveAppt(appt);
@@ -313,6 +447,9 @@ export function DoctorConsultations() {
       setLabRequests([]);
       setSelectedTestTypeId("");
       setLabPriority("NORMAL");
+      setAdmitDone(false);
+      setSurgeryDone(false);
+      setCareTasksDone([]);
       loadQueue();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to complete consultation."));
@@ -873,6 +1010,349 @@ export function DoctorConsultations() {
                     className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
                   />
                   <p className="text-xs text-[#94A3B8] italic font-medium">Prescription will be submitted when you complete the consultation.</p>
+                </div>
+              )}
+            </div>
+
+            {/* ════════════════════════════════════════════════════════════ */}
+            {/* ────────────── ADMIT PATIENT TO WARD ──────────────────── */}
+            {/* ════════════════════════════════════════════════════════════ */}
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
+              <button
+                onClick={() => setShowAdmit(!showAdmit)}
+                className="w-full flex items-center justify-between px-5 py-3.5 bg-[#F8FAFC] text-sm font-bold text-[#0F172A] cursor-pointer hover:bg-[#F1F5F9] transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <BedDouble size={16} className="text-[#F59E0B]" />
+                  Admit Patient to Ward
+                  {admitDone && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#10B981] text-white text-[10px] font-bold">
+                      ✓ Admitted
+                    </span>
+                  )}
+                </span>
+                <ChevronDown size={16} className={`transition-transform ${showAdmit ? "rotate-180" : ""}`} />
+              </button>
+              {showAdmit && (
+                <div className="p-5 bg-white border-t border-[#E2E8F0] space-y-4">
+                  {admitDone ? (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0]">
+                      <CheckCircle size={20} className="text-[#10B981]" />
+                      <p className="text-sm font-semibold text-[#166534]">
+                        Patient has been admitted successfully. The receptionist can view this admission.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl p-4 space-y-3">
+                      <p className="text-xs font-bold text-[#92400E] uppercase tracking-wider">Admission Details</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="col-span-2">
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Room</label>
+                          <select
+                            value={admitForm.roomId}
+                            onChange={(e) => setAdmitForm(f => ({ ...f, roomId: e.target.value }))}
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#F59E0B] bg-white"
+                          >
+                            <option value="">Select available room…</option>
+                            {rooms.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.roomNumber} — {r.wardName || `Ward #${r.wardId}`} ({r.bedCount} bed{r.bedCount > 1 ? "s" : ""})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Bed Number</label>
+                          <input
+                            type="number"
+                            value={admitForm.bedNumber}
+                            onChange={(e) => setAdmitForm(f => ({ ...f, bedNumber: e.target.value }))}
+                            min={1}
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#F59E0B]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Admission Reason</label>
+                          <input
+                            value={admitForm.admissionReason}
+                            onChange={(e) => setAdmitForm(f => ({ ...f, admissionReason: e.target.value }))}
+                            placeholder="e.g. Post-operative observation"
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#F59E0B]"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Diagnosis (optional, auto-filled from above)</label>
+                          <input
+                            value={admitForm.diagnosis || diagnosis}
+                            onChange={(e) => setAdmitForm(f => ({ ...f, diagnosis: e.target.value }))}
+                            placeholder="Will use consultation diagnosis if left empty"
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#F59E0B]"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={submitAdmission}
+                        disabled={submittingAdmit || !admitForm.roomId}
+                        className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-[#F59E0B] text-white text-xs font-bold hover:bg-[#D97706] disabled:opacity-50 cursor-pointer transition-colors"
+                      >
+                        {submittingAdmit ? <RefreshCw size={13} className="animate-spin" /> : <BedDouble size={13} />}
+                        Admit Patient
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ════════════════════════════════════════════════════════════ */}
+            {/* ────────────── SCHEDULE SURGERY ───────────────────────── */}
+            {/* ════════════════════════════════════════════════════════════ */}
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
+              <button
+                onClick={() => setShowSurgery(!showSurgery)}
+                className="w-full flex items-center justify-between px-5 py-3.5 bg-[#F8FAFC] text-sm font-bold text-[#0F172A] cursor-pointer hover:bg-[#F1F5F9] transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Scissors size={16} className="text-[#EF4444]" />
+                  Schedule Surgery
+                  {surgeryDone && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#10B981] text-white text-[10px] font-bold">
+                      ✓ Scheduled
+                    </span>
+                  )}
+                </span>
+                <ChevronDown size={16} className={`transition-transform ${showSurgery ? "rotate-180" : ""}`} />
+              </button>
+              {showSurgery && (
+                <div className="p-5 bg-white border-t border-[#E2E8F0] space-y-4">
+                  {surgeryDone ? (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0]">
+                      <CheckCircle size={20} className="text-[#10B981]" />
+                      <p className="text-sm font-semibold text-[#166534]">
+                        Surgery has been scheduled. It will appear on the Operating Rooms dashboard.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-xl p-4 space-y-3">
+                      <p className="text-xs font-bold text-[#991B1B] uppercase tracking-wider">Surgery Details</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="col-span-2">
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Surgery Type *</label>
+                          <input
+                            value={surgeryForm.surgeryType}
+                            onChange={(e) => setSurgeryForm(f => ({ ...f, surgeryType: e.target.value }))}
+                            placeholder="e.g. Appendectomy, Knee Replacement"
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#EF4444]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Operating Room *</label>
+                          <select
+                            value={surgeryForm.operatingRoomId}
+                            onChange={(e) => setSurgeryForm(f => ({ ...f, operatingRoomId: e.target.value }))}
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#EF4444] bg-white"
+                          >
+                            <option value="">Select OR…</option>
+                            {operatingRooms.filter(or => or.status === "AVAILABLE").map((or) => (
+                              <option key={or.id} value={or.id}>{or.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Scheduled Date & Time *</label>
+                          <input
+                            type="datetime-local"
+                            value={surgeryForm.scheduledAt}
+                            onChange={(e) => setSurgeryForm(f => ({ ...f, scheduledAt: e.target.value }))}
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#EF4444]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Estimated Duration (min)</label>
+                          <input
+                            type="number"
+                            value={surgeryForm.estimatedDuration}
+                            onChange={(e) => setSurgeryForm(f => ({ ...f, estimatedDuration: e.target.value }))}
+                            min={15}
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#EF4444]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Priority</label>
+                          <select
+                            value={surgeryForm.priority}
+                            onChange={(e) => setSurgeryForm(f => ({ ...f, priority: e.target.value }))}
+                            className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#EF4444] bg-white"
+                          >
+                            <option value="NORMAL">Normal</option>
+                            <option value="URGENT">Urgent</option>
+                            <option value="EMERGENCY">Emergency</option>
+                          </select>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs font-semibold text-[#64748B] mb-1">Pre-Op Notes</label>
+                          <textarea
+                            value={surgeryForm.preOpNotes}
+                            onChange={(e) => setSurgeryForm(f => ({ ...f, preOpNotes: e.target.value }))}
+                            rows={2}
+                            placeholder="Pre-operative instructions, allergies to note…"
+                            className="w-full px-3.5 py-2 rounded-xl border border-[#E2E8F0] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#EF4444]"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={submitSurgery}
+                        disabled={submittingSurgery || !surgeryForm.surgeryType || !surgeryForm.operatingRoomId || !surgeryForm.scheduledAt}
+                        className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-[#EF4444] text-white text-xs font-bold hover:bg-[#DC2626] disabled:opacity-50 cursor-pointer transition-colors"
+                      >
+                        {submittingSurgery ? <RefreshCw size={13} className="animate-spin" /> : <Scissors size={13} />}
+                        Schedule Surgery
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ════════════════════════════════════════════════════════════ */}
+            {/* ────────── ASSIGN NURSE & CREATE CARE TASKS ───────────── */}
+            {/* ════════════════════════════════════════════════════════════ */}
+            <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
+              <button
+                onClick={() => setShowCare(!showCare)}
+                className="w-full flex items-center justify-between px-5 py-3.5 bg-[#F8FAFC] text-sm font-bold text-[#0F172A] cursor-pointer hover:bg-[#F1F5F9] transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <UserCheck size={16} className="text-[#0D9488]" />
+                  Assign Nurse & Care Tasks
+                  {careTasksDone.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-[#10B981] text-white text-[10px] font-bold">
+                      {careTasksDone.length} assigned
+                    </span>
+                  )}
+                </span>
+                <ChevronDown size={16} className={`transition-transform ${showCare ? "rotate-180" : ""}`} />
+              </button>
+              {showCare && (
+                <div className="p-5 bg-white border-t border-[#E2E8F0] space-y-4">
+                  <div className="bg-[#F0FDFA] border border-[#99F6E4] rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-bold text-[#134E4A] uppercase tracking-wider">Nurse Assignment</p>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#64748B] mb-1">Select Nurse *</label>
+                      <select
+                        value={selectedNurseId}
+                        onChange={(e) => setSelectedNurseId(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full h-10 px-3.5 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0D9488] bg-white"
+                      >
+                        <option value="">Select a nurse…</option>
+                        {nurses.map((n) => (
+                          <option key={n.id} value={n.id}>
+                            {n.firstName} {n.lastName}{n.departmentName ? ` — ${n.departmentName}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-[#134E4A] uppercase tracking-wider">Care Tasks</p>
+                        <button
+                          onClick={() => setCareTasks(prev => [...prev, { title: "", description: "", priority: "NORMAL" }])}
+                          className="flex items-center gap-1 text-xs text-[#0D9488] font-bold cursor-pointer hover:opacity-80"
+                        >
+                          <Plus size={13} /> Add Task
+                        </button>
+                      </div>
+
+                      {careTasks.length === 0 && (
+                        <div className="bg-white border border-dashed border-[#E2E8F0] rounded-xl p-4 text-center">
+                          <p className="text-xs text-[#94A3B8]">Click "Add Task" to create nursing care tasks for this patient.</p>
+                        </div>
+                      )}
+
+                      {careTasks.map((task, idx) => (
+                        <div key={idx} className="bg-white border border-[#E2E8F0] rounded-xl p-3 space-y-2 relative">
+                          <button
+                            onClick={() => setCareTasks(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-2.5 right-2.5 text-[#94A3B8] hover:text-[#EF4444] cursor-pointer transition-colors"
+                          >
+                            <X size={13} />
+                          </button>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                            <input
+                              value={task.title}
+                              onChange={(e) => {
+                                const updated = [...careTasks];
+                                updated[idx] = { ...updated[idx], title: e.target.value };
+                                setCareTasks(updated);
+                              }}
+                              placeholder="Task title *  e.g. Monitor BP every 2h"
+                              className="sm:col-span-2 h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                            />
+                            <input
+                              value={task.description}
+                              onChange={(e) => {
+                                const updated = [...careTasks];
+                                updated[idx] = { ...updated[idx], description: e.target.value };
+                                setCareTasks(updated);
+                              }}
+                              placeholder="Description (optional)"
+                              className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                            />
+                            <select
+                              value={task.priority}
+                              onChange={(e) => {
+                                const updated = [...careTasks];
+                                updated[idx] = { ...updated[idx], priority: e.target.value };
+                                setCareTasks(updated);
+                              }}
+                              className="h-9 px-2 rounded-lg border border-[#E2E8F0] text-xs focus:outline-none focus:ring-2 focus:ring-[#0D9488] bg-white"
+                            >
+                              <option value="LOW">Low</option>
+                              <option value="NORMAL">Normal</option>
+                              <option value="HIGH">High</option>
+                              <option value="URGENT">Urgent</option>
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {careTasks.length > 0 && (
+                      <button
+                        onClick={submitCareTasks}
+                        disabled={submittingCare || !selectedNurseId || !careTasks.some(t => t.title.trim())}
+                        className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-[#0D9488] text-white text-xs font-bold hover:bg-[#0F766E] disabled:opacity-50 cursor-pointer transition-colors"
+                      >
+                        {submittingCare ? <RefreshCw size={13} className="animate-spin" /> : <ClipboardList size={13} />}
+                        Assign {careTasks.filter(t => t.title.trim()).length} Task(s) to Nurse
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Show already-assigned tasks */}
+                  {careTasksDone.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Assigned This Session</p>
+                      {careTasksDone.map((t, i) => {
+                        const nurse = nurses.find(n => n.id === t.nurseId);
+                        return (
+                          <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[#E2E8F0] bg-[#F0FDFA]">
+                            <div className="w-8 h-8 rounded-lg bg-[#CCFBF1] flex items-center justify-center shrink-0">
+                              <ClipboardList size={15} className="text-[#0D9488]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-[#0F172A] truncate">{t.title}</p>
+                              <p className="text-[10px] font-medium text-[#0D9488] mt-0.5">
+                                Assigned to {nurse ? `${nurse.firstName} ${nurse.lastName}` : `Nurse #${t.nurseId}`}
+                              </p>
+                            </div>
+                            <CheckCircle size={16} className="text-[#10B981]" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

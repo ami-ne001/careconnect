@@ -7,6 +7,7 @@ import type {
   ChronicConditionRequest,
   ChronicConditionResponse
 } from "../types/patient.types";
+import { AdmissionResponse } from "./receptionist.api";
 
 export const patientApi = {
   getProfileByUserId: (userId: number) =>
@@ -29,4 +30,8 @@ export const patientApi = {
 
   removeChronicCondition: (id: number, conditionId: number) =>
     api.delete<void>(`/api/patients/${id}/conditions/${conditionId}`),
+
+  // Admissions
+  getAdmissionsByPatientId: (patientId: number) =>
+    api.get<AdmissionResponse[]>(`/api/admissions/patient/${patientId}`),
 };
