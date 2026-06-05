@@ -11,7 +11,6 @@ import { AdminUsers } from "./pages/admin/UsersManagement";
 import { AdminDepartments } from "./pages/admin/Departments";
 import { AdminAuditLogs } from "./pages/admin/AuditLogs";
 import { AdminReports } from "./pages/admin/Reports";
-import { AdminSystemConfig } from "./pages/admin/SystemConfig";
 import { OperatingRooms } from "./pages/admin/OperatingRooms";
 import { DoctorAvailabilities } from "./pages/admin/DoctorAvailabilities";
 import { AdminWardsRooms } from "./pages/admin/AdminWardsRooms";
@@ -59,6 +58,7 @@ import { LabTestRequests } from "./pages/lab/TestRequests";
 import { LabResultsUpload } from "./pages/lab/ResultsUpload";
 import { LabTestCatalog } from "./pages/lab/TestCatalog";
 import { LabEquipmentStatus } from "./pages/lab/EquipmentStatus";
+import { Notifications } from "./pages/notifications/Notifications";
 
 export const router = createBrowserRouter([
   { path: "/", Component: Login },
@@ -68,13 +68,14 @@ export const router = createBrowserRouter([
     path: "/",
     Component: AppLayout,
     children: [
+      // Shared
+      { path: "notifications", Component: Notifications },
       // Admin
       { path: "admin/dashboard", Component: AdminDashboard },
       { path: "admin/users-management", Component: AdminUsers },
       { path: "admin/departments", Component: AdminDepartments },
       { path: "admin/audit-logs", Component: AdminAuditLogs },
       { path: "admin/reports", Component: AdminReports },
-      { path: "admin/system-config", Component: AdminSystemConfig },
       { path: "admin/operating-rooms", Component: OperatingRooms },
       { path: "admin/doctor-schedules", Component: DoctorAvailabilities },
       { path: "admin/wards-rooms", Component: AdminWardsRooms },

@@ -7,3 +7,4 @@ export * from './appointment.api';
 export * from './clinical.api';
 export * from './billing.api';
 export * from './lab.api';
+export * from './notifications.api';

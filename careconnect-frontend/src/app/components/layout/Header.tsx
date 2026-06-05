@@ -1,5 +1,16 @@
-import { Bell, Search, Menu } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bell, Search, Menu, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { notificationsApi } from "@/api";
+import type { NotificationResponse } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -20,6 +31,57 @@ export function Header({ onMenuClick }: HeaderProps) {
   const role = localStorage.getItem("cc_role") || "Admin";
   const userName = localStorage.getItem("cc_user") || "Admin User";
   const initials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+
+  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const [listRes, countRes] = await Promise.all([
+          notificationsApi.getMyNotifications().catch(() => ({ data: [] as NotificationResponse[] })),
+          notificationsApi.getUnreadCount().catch(() => ({ data: 0 })),
+        ]);
+        if (cancelled) return;
+        setNotifications(listRes.data ?? []);
+        setUnreadCount(Number(countRes.data ?? 0));
+      } catch {
+        if (!cancelled) {
+          setNotifications([]);
+          setUnreadCount(0);
+        }
+      }
+    };
+
+    load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const latestFour = useMemo(
+    () => (notifications ?? []).slice(0, 4),
+    [notifications],
+  );
+
+  const handleMarkAsRead = async (n: NotificationResponse) => {
+    if (n.isRead) {
+      return;
+    }
+    try {
+      await notificationsApi.markAsRead(n.id);
+      setNotifications((prev) =>
+        prev.map((it) => (it.id === n.id ? { ...it, isRead: true } : it)),
+      );
+      setUnreadCount((prev) => (prev > 0 ? prev - 1 : 0));
+    } catch {
+      // ignore error for now
+    }
+  };
 
   return (
     <header
@@ -61,12 +123,65 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Right: bell + user */}
       <div className="flex items-center gap-3">
-        <button className="relative p-2 rounded-lg hover:bg-[#F0F4F8] transition-colors">
-          <Bell size={20} className="text-[#64748B]" />
-          <span className="absolute top-1 right-1 w-4 h-4 bg-[#EF4444] text-white text-[10px] rounded-full flex items-center justify-center font-semibold">
-            3
-          </span>
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="relative p-2 rounded-lg hover:bg-[#F0F4F8] transition-colors">
+              <Bell size={20} className="text-[#64748B]" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-4 h-4 px-1 bg-[#EF4444] text-white text-[10px] rounded-full flex items-center justify-center font-semibold">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-80 mr-4 mt-1">
+            <DropdownMenuLabel className="flex items-center justify-between">
+              <span>Notifications</span>
+              {unreadCount > 0 && (
+                <span className="text-[11px] font-medium text-[#64748B]">
+                  {unreadCount} unread
+                </span>
+              )}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {latestFour.length === 0 ? (
+              <div className="px-3 py-6 text-xs text-[#64748B] text-center">
+                No notifications yet.
+              </div>
+            ) : (
+              latestFour.map((n) => (
+                <DropdownMenuItem
+                  key={n.id}
+                  className={`flex items-start gap-2 py-2 cursor-pointer ${
+                    !n.isRead ? "bg-[#EFF6FF]" : ""
+                  }`}
+                  onClick={() => handleMarkAsRead(n)}
+                >
+                  {!n.isRead ? (
+                    <span className="mt-1 w-2 h-2 rounded-full bg-[#0EA5E9]" />
+                  ) : (
+                    <CheckCircle2 size={14} className="mt-0.5 text-[#94A3B8]" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#0F172A] truncate">
+                      {n.title}
+                    </p>
+                    <p className="text-[11px] text-[#64748B] line-clamp-2">
+                      {n.message}
+                    </p>
+                  </div>
+                </DropdownMenuItem>
+              ))
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="justify-center text-xs font-medium text-[#0EA5E9] cursor-pointer"
+              onClick={() => navigate("/notifications")}
+            >
+              See all notifications
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="flex items-center gap-2.5 cursor-pointer group">
           <div className="w-9 h-9 rounded-full bg-[#1E3A5F] flex items-center justify-center text-white text-sm font-semibold">
             {initials}
