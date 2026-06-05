@@ -3,6 +3,7 @@ import { Outlet, useLocation, Navigate } from "react-router";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { ChevronRight, Home } from "lucide-react";
+import { getAuthItem, getToken, AUTH_STORAGE_KEYS } from "@/store/authStorage";
 
 function Breadcrumb() {
   const location = useLocation();
@@ -46,8 +47,8 @@ function Breadcrumb() {
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const token = localStorage.getItem("cc_token");
-  const role = localStorage.getItem("cc_role");
+  const token = getToken();
+  const role = getAuthItem(AUTH_STORAGE_KEYS.role);
   
   if (!token || !role) {
     return <Navigate to="/auth/login" replace />;

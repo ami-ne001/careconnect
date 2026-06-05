@@ -24,4 +24,11 @@ public class GlobalExceptionHandler {
         errorMap.put("error", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorMap);
     }
+
+    @ExceptionHandler({InvalidResetTokenException.class, ExpiredResetTokenException.class})
+    public ResponseEntity<Map<String, String>> handleResetTokenException(RuntimeException ex) {
+        Map<String, String> errorMap = new HashMap<>();
+        errorMap.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorMap);
+    }
 }

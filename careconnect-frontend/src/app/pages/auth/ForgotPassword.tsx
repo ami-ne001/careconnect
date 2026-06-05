@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Mail, CheckCircle } from "lucide-react";
 import { authApi } from "@/api";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { toast } from "sonner";
 
 export function ForgotPassword() {
@@ -17,9 +18,9 @@ export function ForgotPassword() {
       await authApi.forgotPassword(email);
       setSent(true);
       toast.success("Reset link sent successfully!");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.response?.data?.message || err.message || "Failed to request password reset.");
+      toast.error(getApiErrorMessage(err, "Failed to request password reset."));
     } finally {
       setIsLoading(false);
     }

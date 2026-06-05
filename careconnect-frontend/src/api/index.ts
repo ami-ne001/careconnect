@@ -1,4 +1,5 @@
-export { api, TOKEN_KEY } from './axios';
+export { api } from './axios';
+export { TOKEN_KEY } from '@/store/authStorage';
 export * from './auth.api';
 export * from './admin.api';
 export * from './patient.api';

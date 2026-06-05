@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bell, Search, Menu, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { notificationsApi } from "@/api";
+import { AUTH_STORAGE_KEYS, USER_DISPLAY_KEY, getAuthItem } from "@/store/authStorage";
 import type { NotificationResponse } from "@/types";
 import {
   DropdownMenu,
@@ -28,8 +29,8 @@ const roleColors: Record<string, string> = {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
-  const role = localStorage.getItem("cc_role") || "Admin";
-  const userName = localStorage.getItem("cc_user") || "Admin User";
+  const role = getAuthItem(AUTH_STORAGE_KEYS.role) || "Admin";
+  const userName = getAuthItem(USER_DISPLAY_KEY) || "Admin User";
   const initials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   const [notifications, setNotifications] = useState<NotificationResponse[]>([]);

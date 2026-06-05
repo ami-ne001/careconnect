@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { AUTH_CHANGE_EVENT } from '@/routes/logout';
-import { clearAuthStorage, TOKEN_KEY } from '@/store/authStorage';
+import { clearAuthStorage, getToken } from '@/store/authStorage';
 
 /** Empty baseURL in dev → Vite proxies /api to localhost:8088 (see vite.config.ts) */
 export const api = axios.create({
@@ -10,14 +10,14 @@ export const api = axios.create({
   },
 });
 
-const PUBLIC_PATHS = ['/api/auth/login', '/api/auth/forgot-password'];
+const PUBLIC_PATHS = ['/api/auth/login', '/api/auth/forgot-password', '/api/auth/reset-password'];
 
 api.interceptors.request.use((config) => {
   const url = config.url ?? '';
   const isPublic = PUBLIC_PATHS.some((path) => url.includes(path));
 
   if (!isPublic) {
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token = getToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -38,5 +38,3 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
-
-export { TOKEN_KEY };

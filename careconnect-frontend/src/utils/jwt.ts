@@ -28,7 +28,7 @@ export function normalizeRole(role: string | undefined | null): UserRole | null 
   if (!role) {
     return null;
   }
-  const upper = role.toUpperCase();
+  const normalized = role.trim().replace(/\s+/g, '_').toUpperCase();
   const allowed: UserRole[] = [
     'ADMIN',
     'DOCTOR',
@@ -37,5 +37,5 @@ export function normalizeRole(role: string | undefined | null): UserRole | null 
     'PATIENT',
     'LAB_TECHNICIAN',
   ];
-  return allowed.includes(upper as UserRole) ? (upper as UserRole) : null;
+  return allowed.includes(normalized as UserRole) ? (normalized as UserRole) : null;
 }

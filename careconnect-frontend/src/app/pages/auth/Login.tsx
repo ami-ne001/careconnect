@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/store/useAuth";
+import { getApiErrorMessage } from "@/utils/apiError";
 import { toast } from "sonner";
 
 const roleRoutes: Record<string, string> = {
@@ -35,17 +36,12 @@ export function Login() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const userRole = await login(email, password);
-      // Map database role to uppercase to set the storage variables correctly
-      localStorage.setItem("cc_role", userRole === "LAB_TECHNICIAN" ? "Lab Technician" : userRole.charAt(0) + userRole.slice(1).toLowerCase());
-      const firstName = localStorage.getItem("cc_firstName") || "";
-      const lastName = localStorage.getItem("cc_lastName") || "";
-      localStorage.setItem("cc_user", `${firstName} ${lastName}`.trim() || "User");
+      const userRole = await login(email, password, remember);
       toast.success("Successfully logged in!");
       navigate(roleRoutes[userRole] || "/admin/dashboard");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.response?.data?.message || err.message || "Failed to sign in. Please verify your credentials.");
+      toast.error(getApiErrorMessage(err, "Failed to sign in. Please verify your credentials."));
     } finally {
       setIsLoading(false);
     }

@@ -3,6 +3,7 @@ package com.careconnect.auth.controller;
 import com.careconnect.auth.dto.ForgotPasswordRequest;
 import com.careconnect.auth.dto.LoginRequest;
 import com.careconnect.auth.dto.LoginResponse;
+import com.careconnect.auth.dto.ResetPasswordRequest;
 import com.careconnect.auth.dto.UserResponse;
 import com.careconnect.auth.dto.UserUpdateRequest;
 import com.careconnect.auth.service.AdminUserService;
@@ -24,12 +25,31 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+        LoginResponse response = authService.login(request);
+        
+        long maxAge = (Boolean.TRUE.equals(request.getRememberMe())) ? 7 * 24 * 60 * 60 : 24 * 60 * 60; // 7 days or 1 day
+        
+        org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from("remember-me", response.getToken())
+                .httpOnly(true)
+                .secure(false) // Assuming HTTP for local dev; change to true for HTTPS
+                .path("/")
+                .maxAge(maxAge)
+                .build();
+                
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(response);
     }
 
     @PostMapping("/forgot-password")
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
         return ResponseEntity.noContent().build();
     }
 

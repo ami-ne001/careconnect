@@ -4,6 +4,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 // Auth
 import { Login } from "./pages/auth/Login";
 import { ForgotPassword } from "./pages/auth/ForgotPassword";
+import { ResetPassword } from "./pages/auth/ResetPassword";
 
 // Admin
 import { AdminDashboard } from "./pages/admin/Dashboard";
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
   { path: "/", Component: Login },
   { path: "/auth/login", Component: Login },
   { path: "/auth/forgot-password", Component: ForgotPassword },
+  { path: "/auth/reset-password", Component: ResetPassword },
   {
     path: "/",
     Component: AppLayout,

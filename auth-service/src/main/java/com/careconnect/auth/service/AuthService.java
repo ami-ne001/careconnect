@@ -3,24 +3,23 @@ package com.careconnect.auth.service;
 import com.careconnect.auth.dto.ForgotPasswordRequest;
 import com.careconnect.auth.dto.LoginRequest;
 import com.careconnect.auth.dto.LoginResponse;
+import com.careconnect.auth.dto.ResetPasswordRequest;
 import com.careconnect.auth.entity.User;
 import com.careconnect.auth.exception.InvalidCredentialsException;
-import com.careconnect.auth.exception.UserNotFoundException;
 import com.careconnect.auth.repository.UserRepository;
 import com.careconnect.auth.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+
+    private final PasswordResetService passwordResetService;
 
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
@@ -47,10 +46,10 @@ public class AuthService {
     }
 
     public void forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail().trim())
-                .orElseThrow(() -> new UserNotFoundException("No account found with this email address"));
+        passwordResetService.requestReset(request.getEmail());
+    }
 
-        // Email delivery is handled separately; this endpoint only validates the user exists.
-        log.info("Password reset requested for user id={} email={}", user.getId(), user.getEmail());
+    public void resetPassword(ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
     }
 }

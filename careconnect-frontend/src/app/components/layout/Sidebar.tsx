@@ -1,5 +1,12 @@
 import { useLocation, useNavigate } from "react-router";
 import {
+  AUTH_STORAGE_KEYS,
+  USER_DISPLAY_KEY,
+  clearAuthStorage,
+  getAuthItem,
+} from "@/store/authStorage";
+import { AUTH_CHANGE_EVENT } from "@/routes/logout";
+import {
   LayoutDashboard, Users, Building2, FileText, BarChart3,
   Calendar, UserCircle, ClipboardList, Pill, FlaskConical, FolderOpen,
   HeartPulse, Stethoscope, Activity, Clock, CreditCard, UserCheck,
@@ -76,8 +83,8 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const role = localStorage.getItem("cc_role") || "Admin";
-  const userName = localStorage.getItem("cc_user") || "Admin User";
+  const role = getAuthItem(AUTH_STORAGE_KEYS.role) || "Admin";
+  const userName = getAuthItem(USER_DISPLAY_KEY) || "Admin User";
   const navItems = navByRole[role] || navByRole["Admin"];
   const initials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
@@ -85,15 +92,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const receptionistInpatientPaths = ["/receptionist/admissions", "/receptionist/rooms", "/admin/operating-rooms"];
 
   const handleLogout = () => {
-    localStorage.removeItem("cc_role");
-    localStorage.removeItem("cc_user");
-    localStorage.removeItem("cc_token");
-    localStorage.removeItem("cc_userId");
-    localStorage.removeItem("cc_email");
-    localStorage.removeItem("cc_firstName");
-    localStorage.removeItem("cc_lastName");
-    localStorage.removeItem("cc-auth");
-    window.dispatchEvent(new Event("cc-auth-change"));
+    clearAuthStorage();
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
     navigate("/auth/login");
   };
 
