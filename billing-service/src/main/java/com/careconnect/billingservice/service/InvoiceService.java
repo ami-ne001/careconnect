@@ -54,35 +54,39 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceResponse createInvoiceFromEvent(Long consultationId, Long patientId, BigDecimal consultationFee, String diagnosis) {
-        log.info("Auto-creating invoice for consultation ID: {}", consultationId);
+        log.info("Auto-creating or updating invoice for consultation ID: {}", consultationId);
 
-        Optional<Invoice> existingInvoice = invoiceRepository.findByConsultationId(consultationId);
-        if (existingInvoice.isPresent()) {
-            log.warn("Invoice already exists for consultation ID: {}. Skipping auto-creation.", consultationId);
-            return mapToResponse(existingInvoice.get());
+        Invoice invoice = invoiceRepository.findByConsultationId(consultationId)
+                .orElseGet(() -> {
+                    Invoice newInvoice = Invoice.builder()
+                            .patientId(patientId)
+                            .consultationId(consultationId)
+                            .notes("Auto-generated for diagnosis: " + diagnosis)
+                            .status(InvoiceStatus.PENDING)
+                            .build();
+                    return invoiceRepository.save(newInvoice);
+                });
+
+        // Check if consultation fee already added to avoid duplicates if event is processed twice
+        boolean feeAlreadyExists = invoice.getItems().stream()
+                .anyMatch(item -> "Consultation Fee".equals(item.getDescription()));
+
+        if (!feeAlreadyExists) {
+            InvoiceItem item = InvoiceItem.builder()
+                    .invoice(invoice)
+                    .description("Consultation Fee")
+                    .quantity(1)
+                    .unitPrice(consultationFee)
+                    .build();
+
+            invoiceItemRepository.save(item);
+            invoice.getItems().add(item);
+            
+            recalculateTotalAmount(invoice);
+            invoice = invoiceRepository.save(invoice);
         }
 
-        Invoice invoice = Invoice.builder()
-                .patientId(patientId)
-                .consultationId(consultationId)
-                .notes("Auto-generated for diagnosis: " + diagnosis)
-                .status(InvoiceStatus.PENDING)
-                .build();
-
-        invoice = invoiceRepository.save(invoice);
-
-        InvoiceItem item = InvoiceItem.builder()
-                .invoice(invoice)
-                .description("Consultation Fee")
-                .quantity(1)
-                .unitPrice(consultationFee)
-                .build();
-
-        invoiceItemRepository.save(item);
-        invoice.getItems().add(item);
-        
-        recalculateTotalAmount(invoice);
-        return mapToResponse(invoiceRepository.save(invoice));
+        return mapToResponse(invoice);
     }
 
     @Transactional
