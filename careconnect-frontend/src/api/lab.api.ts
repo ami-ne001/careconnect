@@ -147,6 +147,9 @@ export const labApi = {
   reportMaintenance: (equipmentId: number, body: MaintenanceCreateRequest) =>
     api.post<MaintenanceResponse>(`/api/lab/equipment/${equipmentId}/maintenance`, body),
 
+  resolveMaintenance: (maintenanceId: number, body: { status: string; resolution: string }) =>
+    api.patch<MaintenanceResponse>(`/api/lab/equipment/maintenance/${maintenanceId}`, body),
+
   // Lab Requests
   getAllLabRequests: () =>
     api.get<LabRequestResponse[]>("/api/lab/requests"),
