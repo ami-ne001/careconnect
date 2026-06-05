@@ -159,6 +159,49 @@ public class SurgeryService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<SurgeryResponse> getSurgeriesByStatus(SurgeryStatus status) {
+        return surgeryRepository.findAll().stream()
+                .filter(s -> s.getStatus() == status)
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public SurgeryResponse setSurgeryPrice(Long id, com.careconnect.clinicalservice.dto.SurgeryPriceUpdateRequest request, Long updaterUserId) {
+        log.info("Setting price for surgery ID: {}", id);
+        Surgery surgery = surgeryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Surgery not found with id: " + id));
+
+        if (surgery.getStatus() != SurgeryStatus.COMPLETED) {
+            throw new BadRequestException("Can only bill completed surgeries");
+        }
+
+        surgery.setPrice(request.getPrice());
+        Surgery saved = surgeryRepository.save(surgery);
+
+        // Publish Event
+        com.careconnect.clinicalservice.messaging.SurgeryBilledEvent event = com.careconnect.clinicalservice.messaging.SurgeryBilledEvent.builder()
+                .surgeryId(saved.getId())
+                .patientId(saved.getPatientId())
+                .admissionId(saved.getAdmissionId())
+                .surgeryType(saved.getSurgeryType())
+                .price(saved.getPrice())
+                .build();
+        eventPublisher.publishSurgeryBilled(event);
+
+        // Audit Log
+        auditLogRepository.save(AuditLog.builder()
+                .userId(updaterUserId)
+                .action(AuditAction.UPDATE)
+                .module("SURGERY_BILLING")
+                .description("Set price for surgery ID: " + saved.getId() + " to " + saved.getPrice())
+                .ipAddress("127.0.0.1")
+                .build());
+
+        return mapToResponse(saved);
+    }
+
     @Transactional
     public SurgeryResponse updateSurgery(Long id, SurgeryUpdateRequest request, Long updaterUserId) {
         log.info("Updating surgery ID: {}", id);
@@ -207,6 +250,9 @@ public class SurgeryService {
         }
         if (request.getSpecialEquipment() != null) {
             surgery.setSpecialEquipment(request.getSpecialEquipment());
+        }
+        if (request.getPrice() != null) {
+            surgery.setPrice(request.getPrice());
         }
 
         if (request.getStatus() != null && request.getStatus() != surgery.getStatus()) {
@@ -306,6 +352,7 @@ public class SurgeryService {
                 .specialEquipment(s.getSpecialEquipment())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
+                .price(s.getPrice())
                 .build();
     }
 

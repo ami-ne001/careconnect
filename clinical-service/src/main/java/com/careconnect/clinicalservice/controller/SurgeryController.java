@@ -4,6 +4,8 @@ import com.careconnect.clinicalservice.dto.PostOpNotesRequest;
 import com.careconnect.clinicalservice.dto.SurgeryCreateRequest;
 import com.careconnect.clinicalservice.dto.SurgeryResponse;
 import com.careconnect.clinicalservice.dto.SurgeryUpdateRequest;
+import com.careconnect.clinicalservice.dto.SurgeryPriceUpdateRequest;
+import com.careconnect.clinicalservice.enums.SurgeryStatus;
 import com.careconnect.clinicalservice.service.SurgeryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +65,21 @@ public class SurgeryController {
     @PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
     public ResponseEntity<List<SurgeryResponse>> getSurgeriesBySurgeon(@PathVariable Long surgeonId) {
         return ResponseEntity.ok(surgeryService.getSurgeriesByLeadSurgeon(surgeonId));
+    }
+
+    @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'DOCTOR')")
+    public ResponseEntity<List<SurgeryResponse>> getSurgeriesByStatus(@PathVariable SurgeryStatus status) {
+        return ResponseEntity.ok(surgeryService.getSurgeriesByStatus(status));
+    }
+
+    @PutMapping("/{id}/price")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    public ResponseEntity<SurgeryResponse> setSurgeryPrice(@PathVariable Long id, 
+                                                           @Valid @RequestBody SurgeryPriceUpdateRequest request, 
+                                                           Authentication authentication) {
+        Long updaterId = Long.valueOf(authentication.getName());
+        return ResponseEntity.ok(surgeryService.setSurgeryPrice(id, request, updaterId));
     }
 
     @GetMapping("/metrics/scheduled-this-month")

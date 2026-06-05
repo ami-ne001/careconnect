@@ -15,9 +15,11 @@ public class RabbitMQConfig {
 
     public static final String CONSULTATION_CLOSED_QUEUE = "billing-consultation-closed-queue";
     public static final String PATIENT_DISCHARGED_QUEUE = "billing-patient-discharged-queue";
+    public static final String SURGERY_BILLED_QUEUE = "billing-surgery-billed-queue";
 
     public static final String ROUTING_KEY_CONSULTATION_CLOSED = "consultation.closed";
     public static final String ROUTING_KEY_PATIENT_DISCHARGED = "patient.discharged";
+    public static final String ROUTING_KEY_SURGERY_BILLED = "surgery.billed";
 
     @Bean
     public TopicExchange careConnectExchange() {
@@ -46,6 +48,18 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(patientDischargedQueue)
                 .to(careConnectExchange)
                 .with(ROUTING_KEY_PATIENT_DISCHARGED);
+    }
+
+    @Bean
+    public Queue surgeryBilledQueue() {
+        return new Queue(SURGERY_BILLED_QUEUE, true);
+    }
+
+    @Bean
+    public Binding bindingSurgeryBilled(Queue surgeryBilledQueue, TopicExchange careConnectExchange) {
+        return BindingBuilder.bind(surgeryBilledQueue)
+                .to(careConnectExchange)
+                .with(ROUTING_KEY_SURGERY_BILLED);
     }
 
     @Bean
