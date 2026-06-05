@@ -1,24 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
+import { useAuth } from "../../../store/useAuth";
+import { clinicalApi, PrescriptionResponse } from "../../../api/clinical.api";
+import { patientApi } from "../../../api/patient.api";
+import { receptionistApi, AdmissionResponse } from "../../../api/receptionist.api";
+import type { PatientProfileResponse } from "../../../types/patient.types";
 
-const schedule = [
-  { time: "08:00", patient: "Carlos Rivera", room: "302", med: "Metformin 500mg", dose: "1 tab", route: "Oral", status: "administered" },
-  { time: "08:00", patient: "Layla Hassan", room: "304", med: "Lisinopril 10mg", dose: "1 tab", route: "Oral", status: "administered" },
-  { time: "09:00", patient: "Fatima Al-Zahrani", room: "301", med: "Bisoprolol 5mg", dose: "1 tab", route: "Oral", status: "administered" },
-  { time: "10:00", patient: "John Whitaker", room: "303", med: "Furosemide 40mg", dose: "40mg", route: "IV", status: "pending" },
-  { time: "10:00", patient: "Omar Benali", room: "305", med: "Amlodipine 5mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "11:00", patient: "Yasmine Tazi", room: "306", med: "Ferrous Sulphate 200mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "12:00", patient: "Thomas Grey", room: "307", med: "Atorvastatin 40mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "12:00", patient: "Carlos Rivera", room: "302", med: "Insulin Glargine 10U", dose: "10U", route: "SC", status: "pending" },
-  { time: "14:00", patient: "John Whitaker", room: "303", med: "Digoxin 0.125mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "15:00", patient: "Maria Santos", room: "308", med: "Metformin 500mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "16:00", patient: "Fatima Al-Zahrani", room: "301", med: "Potassium Chloride", dose: "20mEq", route: "IV", status: "pending" },
-  { time: "18:00", patient: "Layla Hassan", room: "304", med: "Amlodipine 5mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "19:00", patient: "Omar Benali", room: "305", med: "Pantoprazole 40mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "20:00", patient: "Carlos Rivera", room: "302", med: "Metformin 500mg", dose: "1 tab", route: "Oral", status: "pending" },
-  { time: "20:00", patient: "John Whitaker", room: "303", med: "Furosemide 40mg", dose: "40mg", route: "IV", status: "pending" },
-];
+interface ScheduleItem {
+  id: string;
+  time: string;
+  patientId: number;
+  med: string;
+  dose: string;
+  route: string;
+  status: string;
+  roomNumber: string;
+}
 
 const routeColors: Record<string, string> = {
   Oral: "bg-blue-100 text-blue-700",
@@ -28,19 +26,78 @@ const routeColors: Record<string, string> = {
 };
 
 export function NurseMedications() {
+  const { userId } = useAuth();
   const [filter, setFilter] = useState("All");
-  const [statuses, setStatuses] = useState<Record<number, string>>({});
+  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [patients, setPatients] = useState<Record<number, PatientProfileResponse>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    // Get active admissions for patients this nurse is caring for
+    clinicalApi.getCareTasksAssignedTo(userId).then(r => {
+      const patientIds = Array.from(new Set(r.data.map(t => t.patientId)));
+      Promise.all(patientIds.map(id => patientApi.getAdmissionsByPatientId(id).then(a => a.data).catch(() => [])))
+        .then(results => {
+          const activeAdms = results.flatMap(r => r).filter(a => a.status === "ADMITTED");
+          
+          // Fetch profiles and prescriptions for these admissions
+          activeAdms.forEach(adm => {
+            patientApi.getProfileById(adm.patientId)
+              .then(p => setPatients(prev => ({ ...prev, [adm.patientId]: p.data })))
+              .catch(() => {});
+          });
+
+          Promise.all(activeAdms.map(adm => 
+            clinicalApi.getPrescriptionsByPatient(adm.patientId)
+              .then(p => p.data.map(rx => ({ rx, room: adm.room.roomNumber })))
+              .catch(() => [])
+          )).then(rxResults => {
+            const activeRx = rxResults.flatMap(r => r).filter(({ rx }) => rx.status === "ACTIVE");
+            
+            // Generate schedule items from prescriptions
+            const items: ScheduleItem[] = [];
+            activeRx.forEach(({ rx, room }) => {
+              rx.items.forEach((item, idx) => {
+                // Determine a time based on frequency for demonstration
+                let time = "08:00";
+                if (item.frequency.toLowerCase().includes("night") || item.frequency.toLowerCase().includes("bed")) time = "20:00";
+                else if (item.frequency.toLowerCase().includes("twice")) time = "08:00 & 20:00";
+
+                items.push({
+                  id: `${rx.id}-${idx}`,
+                  time,
+                  patientId: rx.patientId,
+                  med: item.medication,
+                  dose: item.dosage,
+                  route: "Oral",
+                  status: "pending",
+                  roomNumber: room,
+                });
+              });
+            });
+            setSchedule(items);
+            setLoading(false);
+          });
+        });
+    }).catch(() => setLoading(false));
+  }, [userId]);
+
+  const getPatientName = (id: number) => {
+    const p = patients[id];
+    return p ? `${p.firstName || ""} ${p.lastName || ""}`.trim() || `Patient #${id}` : `Patient #${id}`;
+  };
+
+  const markStatus = (id: string, val: string) => {
+    setSchedule(prev => prev.map(item => item.id === id ? { ...item, status: val } : item));
+  };
 
   const filtered = schedule.filter((m) => {
-    if (filter === "Pending") return (statuses[schedule.indexOf(m)] || m.status) === "pending";
-    if (filter === "Administered") return (statuses[schedule.indexOf(m)] || m.status) === "administered";
-    if (filter === "Skipped") return (statuses[schedule.indexOf(m)] || m.status) === "skipped";
+    if (filter === "Pending") return m.status === "pending";
+    if (filter === "Administered") return m.status === "administered";
+    if (filter === "Skipped") return m.status === "skipped";
     return true;
   });
-
-  const markStatus = (idx: number, val: string) => {
-    setStatuses((prev) => ({ ...prev, [idx]: val }));
-  };
 
   return (
     <div>
@@ -52,52 +109,57 @@ export function NurseMedications() {
             {f}
           </button>
         ))}
-        <input placeholder="Filter by patient..." className="ml-auto h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm w-48 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
       </div>
 
-      <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                {["Time", "Patient", "Room", "Medication", "Dose", "Route", "Status", "Actions"].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((m, i) => {
-                const idx = schedule.indexOf(m);
-                const currentStatus = statuses[idx] || m.status;
-                return (
-                  <tr key={i} className={`border-b border-[#F1F5F9] ${currentStatus === "administered" ? "bg-emerald-50/40" : currentStatus === "skipped" ? "bg-red-50/40" : i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
-                    <td className="px-5 py-3.5 font-bold text-[#0F172A]">{m.time}</td>
-                    <td className="px-5 py-3.5 font-medium text-[#0F172A]">{m.patient}</td>
-                    <td className="px-5 py-3.5 text-[#64748B]">{m.room}</td>
-                    <td className="px-5 py-3.5 text-[#0F172A]">{m.med}</td>
-                    <td className="px-5 py-3.5 text-[#64748B]">{m.dose}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${routeColors[m.route] || "bg-gray-100 text-gray-600"}`}>{m.route}</span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <Badge variant={currentStatus === "administered" ? "active" : currentStatus === "skipped" ? "critical" : "pending"} dot>{currentStatus}</Badge>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {currentStatus === "pending" && (
-                        <div className="flex gap-2">
-                          <button onClick={() => markStatus(idx, "administered")} className="px-3 py-1.5 rounded-lg bg-[#10B981] text-white text-xs font-medium hover:opacity-90">✓ Administer</button>
-                          <button onClick={() => markStatus(idx, "skipped")} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100">Skip</button>
-                        </div>
-                      )}
-                      {currentStatus !== "pending" && <span className="text-xs text-[#94A3B8]">Recorded</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <span className="animate-spin rounded-full h-8 w-8 border-4 border-[#1E3A5F] border-t-transparent" />
+          <span className="text-sm text-[#64748B]">Loading medications…</span>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                  {["Time", "Patient", "Room", "Medication", "Dose", "Route", "Status", "Actions"].map((h) => (
+                    <th key={h} className="text-left px-5 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((m, i) => {
+                  return (
+                    <tr key={m.id} className={`border-b border-[#F1F5F9] ${m.status === "administered" ? "bg-emerald-50/40" : m.status === "skipped" ? "bg-red-50/40" : i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
+                      <td className="px-5 py-3.5 font-bold text-[#0F172A]">{m.time}</td>
+                      <td className="px-5 py-3.5 font-medium text-[#0F172A]">{getPatientName(m.patientId)}</td>
+                      <td className="px-5 py-3.5 text-[#64748B]">{m.roomNumber}</td>
+                      <td className="px-5 py-3.5 text-[#0F172A]">{m.med}</td>
+                      <td className="px-5 py-3.5 text-[#64748B]">{m.dose}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${routeColors[m.route] || "bg-gray-100 text-gray-600"}`}>{m.route}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Badge variant={m.status === "administered" ? "active" : m.status === "skipped" ? "critical" : "pending"} dot>{m.status}</Badge>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {m.status === "pending" && (
+                          <div className="flex gap-2">
+                            <button onClick={() => markStatus(m.id, "administered")} className="px-3 py-1.5 rounded-lg bg-[#10B981] text-white text-xs font-medium hover:opacity-90">✓ Administer</button>
+                            <button onClick={() => markStatus(m.id, "skipped")} className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100">Skip</button>
+                          </div>
+                        )}
+                        {m.status !== "pending" && <span className="text-xs text-[#94A3B8]">Recorded</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && <tr><td colSpan={8} className="px-5 py-8 text-sm text-[#64748B] text-center">No medications scheduled.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

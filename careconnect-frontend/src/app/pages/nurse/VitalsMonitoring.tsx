@@ -1,27 +1,62 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-
-const patients = [
-  { room: "301", name: "Fatima Al-Zahrani", lastRecorded: "08:30 AM", bp: "138/90", hr: "92", temp: "37.8", o2: "95", status: "watch" },
-  { room: "302", name: "Carlos Rivera", lastRecorded: "08:45 AM", bp: "124/78", hr: "74", temp: "36.9", o2: "98", status: "stable" },
-  { room: "303", name: "John Whitaker", lastRecorded: "07:50 AM", bp: "158/96", hr: "102", temp: "38.2", o2: "93", status: "critical" },
-  { room: "304", name: "Layla Hassan", lastRecorded: "09:00 AM", bp: "118/76", hr: "68", temp: "36.6", o2: "99", status: "stable" },
-  { room: "305", name: "Omar Benali", lastRecorded: "08:15 AM", bp: "142/88", hr: "84", temp: "37.2", o2: "96", status: "watch" },
-  { room: "306", name: "Yasmine Tazi", lastRecorded: "09:10 AM", bp: "110/70", hr: "70", temp: "36.7", o2: "98", status: "stable" },
-  { room: "307", name: "Thomas Grey", lastRecorded: "07:40 AM", bp: "148/92", hr: "88", temp: "37.0", o2: "94", status: "watch" },
-  { room: "308", name: "Maria Santos", lastRecorded: "08:55 AM", bp: "126/80", hr: "72", temp: "37.1", o2: "97", status: "stable" },
-];
+import { useAuth } from "../../../store/useAuth";
+import { clinicalApi, VitalsResponse } from "../../../api/clinical.api";
+import { patientApi } from "../../../api/patient.api";
+import { receptionistApi, AdmissionResponse } from "../../../api/receptionist.api";
+import type { PatientProfileResponse } from "../../../types/patient.types";
 
 const borderMap: Record<string, string> = { stable: "border-emerald-200", watch: "border-amber-200", critical: "border-red-200" };
-const bgMap: Record<string, string> = { stable: "bg-emerald-50", watch: "bg-amber-50", critical: "bg-red-50" };
 const dotMap: Record<string, string> = { stable: "bg-emerald-500", watch: "bg-amber-500", critical: "bg-red-500" };
 
 export function NurseVitals() {
-  const [showModal, setShowModal] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<string>("");
+  const { userId } = useAuth();
+  const [admissions, setAdmissions] = useState<AdmissionResponse[]>([]);
+  const [patients, setPatients] = useState<Record<number, PatientProfileResponse>>({});
+  const [vitals, setVitals] = useState<Record<number, VitalsResponse>>({});
+  const [loading, setLoading] = useState(true);
 
-  const critical = patients.filter((p) => p.status === "critical" || p.o2 < "95");
+  const [showModal, setShowModal] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+
+  useEffect(() => {
+    if (!userId) return;
+    // Get active admissions for patients this nurse is caring for
+    clinicalApi.getCareTasksAssignedTo(userId).then(r => {
+      const patientIds = Array.from(new Set(r.data.map(t => t.patientId)));
+      Promise.all(patientIds.map(id => patientApi.getAdmissionsByPatientId(id).then(a => a.data).catch(() => [])))
+        .then(results => {
+          const active = results.flatMap(r => r).filter(a => a.status === "ADMITTED");
+          setAdmissions(active);
+
+          active.forEach(adm => {
+            patientApi.getProfileById(adm.patientId)
+              .then(p => setPatients(prev => ({ ...prev, [adm.patientId]: p.data })))
+              .catch(() => {});
+            clinicalApi.getLatestVitalsByPatient(adm.patientId)
+              .then(v => setVitals(prev => ({ ...prev, [adm.patientId]: v.data })))
+              .catch(() => {});
+          });
+          setLoading(false);
+        });
+    }).catch(() => setLoading(false));
+  }, [userId]);
+
+  const getPatientName = (id: number) => {
+    const p = patients[id];
+    return p ? `${p.firstName || ""} ${p.lastName || ""}`.trim() || `Patient #${id}` : `Patient #${id}`;
+  };
+
+  const getOverallStatus = (patientId: number) => {
+    const v = vitals[patientId];
+    if (!v) return "stable";
+    if ((v.bpSystolic || 0) > 160 || (v.heartRate || 0) > 120 || (v.oxygenSat || 100) < 90) return "critical";
+    if ((v.bpSystolic || 0) > 140 || (v.heartRate || 0) > 100 || (v.oxygenSat || 100) < 95) return "watch";
+    return "stable";
+  };
+
+  const critical = admissions.filter(a => getOverallStatus(a.patientId) === "critical");
 
   return (
     <div>
@@ -41,50 +76,62 @@ export function NurseVitals() {
           <AlertTriangle size={18} className="text-[#EF4444] shrink-0" />
           <p className="text-sm text-[#EF4444] font-medium">
             <strong>{critical.length} patient{critical.length > 1 ? "s" : ""}</strong> flagged with abnormal vitals — immediate attention required:{" "}
-            {critical.map((p) => `${p.name} (${p.room})`).join(", ")}
+            {critical.map((p) => `${getPatientName(p.patientId)} (Room ${p.room.roomNumber})`).join(", ")}
           </p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-        {patients.map((p, i) => (
-          <div key={i} className={`bg-white rounded-xl border-2 p-4 ${borderMap[p.status]}`} style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="font-semibold text-[#0F172A] text-sm">{p.name}</p>
-                <p className="text-xs text-[#64748B]">{p.room} · Last: {p.lastRecorded}</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full animate-pulse ${dotMap[p.status]}`} />
-                <span className="text-xs font-semibold capitalize" style={{ color: p.status === "critical" ? "#EF4444" : p.status === "watch" ? "#F59E0B" : "#10B981" }}>{p.status}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {[
-                { l: "BP", v: p.bp, u: "" },
-                { l: "HR", v: p.hr, u: "bpm" },
-                { l: "Temp", v: p.temp, u: "°C" },
-                { l: "O₂", v: p.o2, u: "%" },
-              ].map((v) => (
-                <div key={v.l} className={`p-2 rounded-lg text-center ${p.status === "critical" ? "bg-red-50" : p.status === "watch" ? "bg-amber-50" : "bg-[#F8FAFC]"}`}>
-                  <p className="text-[9px] text-[#94A3B8] uppercase font-medium">{v.l}</p>
-                  <p className="text-xs font-bold text-[#0F172A] leading-tight">{v.v}</p>
-                  {v.u && <p className="text-[9px] text-[#94A3B8]">{v.u}</p>}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <span className="animate-spin rounded-full h-8 w-8 border-4 border-[#1E3A5F] border-t-transparent" />
+          <span className="text-sm text-[#64748B]">Loading vitals…</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+          {admissions.map((p) => {
+            const v = vitals[p.patientId];
+            const status = getOverallStatus(p.patientId);
+            return (
+              <div key={p.id} className={`bg-white rounded-xl border-2 p-4 ${borderMap[status]}`} style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-semibold text-[#0F172A] text-sm">{getPatientName(p.patientId)}</p>
+                    <p className="text-xs text-[#64748B]">Room {p.room.roomNumber} · Last: {v ? new Date(v.recordedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Never"}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full animate-pulse ${dotMap[status]}`} />
+                    <span className="text-xs font-semibold capitalize" style={{ color: status === "critical" ? "#EF4444" : status === "watch" ? "#F59E0B" : "#10B981" }}>{status}</span>
+                  </div>
                 </div>
-              ))}
-            </div>
-            {/* Sparkline placeholder */}
-            <div className="h-8 bg-[#F0F4F8] rounded mb-3 flex items-center justify-center overflow-hidden">
-              <svg viewBox="0 0 120 30" className="w-full h-full" preserveAspectRatio="none">
-                <polyline points="0,20 15,15 30,18 45,12 60,16 75,10 90,14 105,8 120,12" fill="none" stroke={p.status === "critical" ? "#EF4444" : p.status === "watch" ? "#F59E0B" : "#10B981"} strokeWidth="2" />
-              </svg>
-            </div>
-            <button onClick={() => { setSelectedPatient(p.name); setShowModal(true); }} className="w-full py-1.5 rounded-lg bg-[#1E3A5F] text-white text-xs font-medium hover:opacity-90 transition-all">
-              Record New Vitals
-            </button>
-          </div>
-        ))}
-      </div>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {[
+                    { l: "BP", v: v ? `${v.bpSystolic}/${v.bpDiastolic}` : "—", u: "" },
+                    { l: "HR", v: v?.heartRate || "—", u: "bpm" },
+                    { l: "Temp", v: v?.temperature || "—", u: "°C" },
+                    { l: "O₂", v: v?.oxygenSat || "—", u: "%" },
+                  ].map((val) => (
+                    <div key={val.l} className={`p-2 rounded-lg text-center ${status === "critical" ? "bg-red-50" : status === "watch" ? "bg-amber-50" : "bg-[#F8FAFC]"}`}>
+                      <p className="text-[9px] text-[#94A3B8] uppercase font-medium">{val.l}</p>
+                      <p className="text-xs font-bold text-[#0F172A] leading-tight">{val.v}</p>
+                      {val.u && <p className="text-[9px] text-[#94A3B8]">{val.u}</p>}
+                    </div>
+                  ))}
+                </div>
+                {/* Sparkline placeholder */}
+                <div className="h-8 bg-[#F0F4F8] rounded mb-3 flex items-center justify-center overflow-hidden">
+                  <svg viewBox="0 0 120 30" className="w-full h-full" preserveAspectRatio="none">
+                    <polyline points="0,20 15,15 30,18 45,12 60,16 75,10 90,14 105,8 120,12" fill="none" stroke={status === "critical" ? "#EF4444" : status === "watch" ? "#F59E0B" : "#10B981"} strokeWidth="2" />
+                  </svg>
+                </div>
+                <button onClick={() => { setSelectedPatientId(p.patientId.toString()); setShowModal(true); }} className="w-full py-1.5 rounded-lg bg-[#1E3A5F] text-white text-xs font-medium hover:opacity-90 transition-all">
+                  Record New Vitals
+                </button>
+              </div>
+            );
+          })}
+          {admissions.length === 0 && <div className="col-span-full py-10 text-center text-[#64748B]">No patients currently assigned to you.</div>}
+        </div>
+      )}
 
       {/* Record Vitals Modal */}
       {showModal && (
@@ -97,9 +144,9 @@ export function NurseVitals() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Patient</label>
-                <select value={selectedPatient} onChange={(e) => setSelectedPatient(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]">
+                <select value={selectedPatientId} onChange={(e) => setSelectedPatientId(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]">
                   <option value="">Select patient...</option>
-                  {patients.map((p) => <option key={p.name} value={p.name}>{p.name} — {p.room}</option>)}
+                  {admissions.map((p) => <option key={p.id} value={p.patientId}>{getPatientName(p.patientId)} — Room {p.room.roomNumber}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">

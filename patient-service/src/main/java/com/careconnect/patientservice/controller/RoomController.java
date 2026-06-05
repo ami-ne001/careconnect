@@ -46,7 +46,7 @@ public class RoomController {
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'DOCTOR', 'NURSE')")
     public ResponseEntity<List<RoomResponse>> getAvailableRooms() {
         return ResponseEntity.ok(roomService.getAvailableRooms());
     }

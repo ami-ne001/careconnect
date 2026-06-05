@@ -43,8 +43,9 @@ public class AdmissionService {
 
     @Transactional
     public AdmissionResponse admitPatient(AdmissionCreateRequest request, Long receptionistUserId) {
-        PatientProfile patient = patientProfileRepository.findById(request.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found with id: " + request.getPatientId()));
+        PatientProfile patient = patientProfileRepository.findByUserId(request.getPatientId())
+                .orElseGet(() -> patientProfileRepository.findById(request.getPatientId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found with id or userId: " + request.getPatientId())));
 
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + request.getRoomId()));
@@ -124,10 +125,10 @@ public class AdmissionService {
     }
 
     public List<AdmissionResponse> getAdmissionsByPatientId(Long patientId) {
-        if (!patientProfileRepository.existsById(patientId)) {
-            throw new ResourceNotFoundException("Patient profile not found with id: " + patientId);
-        }
-        return admissionRepository.findByPatientId(patientId).stream()
+        PatientProfile patient = patientProfileRepository.findByUserId(patientId)
+                .orElseGet(() -> patientProfileRepository.findById(patientId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found with id or userId: " + patientId)));
+        return admissionRepository.findByPatientId(patient.getId()).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

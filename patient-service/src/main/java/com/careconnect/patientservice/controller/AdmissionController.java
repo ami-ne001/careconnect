@@ -29,7 +29,7 @@ public class AdmissionController {
     private final AdmissionAnalyticsService admissionAnalyticsService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN', 'DOCTOR')")
     public ResponseEntity<AdmissionResponse> admitPatient(@Valid @RequestBody AdmissionCreateRequest request,
                                                           Authentication authentication) {
         Long receptionistUserId = Long.valueOf(authentication.getName());
