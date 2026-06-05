@@ -29,4 +29,13 @@ public class EventPublisher {
                 event
         );
     }
+
+    public void publishSurgeryBilled(SurgeryBilledEvent event) {
+        log.info("Publishing SurgeryBilledEvent for surgery ID: {}", event.getSurgeryId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_NAME,
+                RabbitMQConfig.ROUTING_KEY_SURGERY_BILLED,
+                event
+        );
+    }
 }

@@ -5,7 +5,9 @@ import com.careconnect.clinicalservice.enums.SurgeryPriority;
 import com.careconnect.clinicalservice.enums.SurgeryStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.*;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "surgeries")
@@ -82,4 +84,7 @@ public class Surgery {
 
     @Column(name = "updated_at", nullable = false, insertable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
     private LocalDateTime updatedAt;
+
+    @Column(name = "price")
+    private BigDecimal price;
 }
