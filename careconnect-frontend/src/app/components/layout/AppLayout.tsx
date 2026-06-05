@@ -13,7 +13,7 @@ function Breadcrumb() {
     patient: "Patient", pharmacist: "Pharmacist", lab: "Lab",
     dashboard: "Dashboard", "users-management": "User Management",
     departments: "Departments", "audit-logs": "Audit Logs",
-    reports: "Reports & Analytics", "system-config": "System Config",
+    reports: "Reports & Analytics",
     appointments: "Appointments", patients: "Patients",
     consultations: "Consultations", prescriptions: "Prescriptions",
     "lab-requests": "Lab Requests", "medical-records": "Medical Records",
@@ -26,6 +26,7 @@ function Breadcrumb() {
     "dispensing-history": "Dispensing History",
     "drug-interactions": "Drug Interactions",
     "test-requests": "Test Workflow", "equipment-status": "Equipment Status",
+    notifications: "Notifications",
   };
 
   return (

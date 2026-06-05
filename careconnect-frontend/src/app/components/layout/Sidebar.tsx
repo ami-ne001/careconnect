@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router";
 import {
-  LayoutDashboard, Users, Building2, FileText, BarChart3, Settings,
+  LayoutDashboard, Users, Building2, FileText, BarChart3,
   Calendar, UserCircle, ClipboardList, Pill, FlaskConical, FolderOpen,
   HeartPulse, Stethoscope, Activity, Clock, CreditCard, UserCheck,
   History, AlertTriangle, TestTube, Upload, Wrench, LogOut,
@@ -22,7 +22,6 @@ const navByRole: Record<string, NavItem[]> = {
     { label: "Departments", icon: <Building2 size={18} />, path: "/admin/departments" },
     { label: "Audit Logs", icon: <FileText size={18} />, path: "/admin/audit-logs" },
     { label: "Reports & Analytics", icon: <BarChart3 size={18} />, path: "/admin/reports" },
-    { label: "System Config", icon: <Settings size={18} />, path: "/admin/system-config" },
     { label: "Operating Rooms", icon: <DoorOpen size={18} />, path: "/admin/operating-rooms" },
   ],
   Doctor: [

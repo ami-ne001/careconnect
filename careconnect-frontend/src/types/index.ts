@@ -8,4 +8,5 @@ export type {
   UserCreateRequest,
   UserUpdateRequest,
 } from './admin.types';
+export type { NotificationType, NotificationResponse } from './notification.types';
 export * from './patient.types';
