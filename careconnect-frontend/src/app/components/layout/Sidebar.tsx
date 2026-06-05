@@ -18,6 +18,7 @@ const navByRole: Record<string, NavItem[]> = {
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, path: "/admin/dashboard" },
     { label: "User Management", icon: <Users size={18} />, path: "/admin/users-management" },
     { label: "Doctor Schedules", icon: <Calendar size={18} />, path: "/admin/doctor-schedules" },
+    { label: "Wards & Rooms", icon: <Building2 size={18} />, path: "/admin/wards-rooms" },
     { label: "Departments", icon: <Building2 size={18} />, path: "/admin/departments" },
     { label: "Audit Logs", icon: <FileText size={18} />, path: "/admin/audit-logs" },
     { label: "Reports & Analytics", icon: <BarChart3 size={18} />, path: "/admin/reports" },

@@ -14,6 +14,7 @@ import { AdminReports } from "./pages/admin/Reports";
 import { AdminSystemConfig } from "./pages/admin/SystemConfig";
 import { OperatingRooms } from "./pages/admin/OperatingRooms";
 import { DoctorAvailabilities } from "./pages/admin/DoctorAvailabilities";
+import { AdminWardsRooms } from "./pages/admin/AdminWardsRooms";
 
 // Doctor
 import { DoctorDashboard } from "./pages/doctor/Dashboard";
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
       { path: "admin/system-config", Component: AdminSystemConfig },
       { path: "admin/operating-rooms", Component: OperatingRooms },
       { path: "admin/doctor-schedules", Component: DoctorAvailabilities },
+      { path: "admin/wards-rooms", Component: AdminWardsRooms },
       // Doctor
       { path: "doctor/dashboard", Component: DoctorDashboard },
       { path: "doctor/appointments", Component: DoctorAppointments },

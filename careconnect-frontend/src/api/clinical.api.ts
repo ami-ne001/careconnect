@@ -357,6 +357,9 @@ export const clinicalApi = {
   getOperatingRooms: () =>
     api.get<OperatingRoomResponse[]>("/api/clinical/operating-rooms"),
 
+  createOperatingRoom: (name: string, notes?: string) =>
+    api.post<OperatingRoomResponse>("/api/clinical/operating-rooms", { name, notes }),
+
   updateOperatingRoomStatus: (id: number, status: string, notes?: string) =>
     api.put<OperatingRoomResponse>(`/api/clinical/operating-rooms/${id}/status`, {
       status,

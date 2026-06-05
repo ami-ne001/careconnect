@@ -4,8 +4,17 @@ import type { PatientProfileResponse } from "../types/patient.types";
 export interface WardResponse {
   id: number;
   name: string;
-  capacity: number;
+  description?: string;
+  floor?: number;
+  capacity?: number;
   genderRestriction?: string;
+  createdAt?: string;
+}
+
+export interface WardCreateRequest {
+  name: string;
+  description?: string;
+  floor?: number;
 }
 
 export interface RoomResponse {
@@ -16,6 +25,14 @@ export interface RoomResponse {
   notes?: string;
   wardId: number;
   wardName?: string;
+}
+
+export interface RoomCreateRequest {
+  wardId: number;
+  roomNumber: string;
+  bedCount: number;
+  status?: string;
+  notes?: string;
 }
 
 export interface AdmissionCreateRequest {
@@ -78,9 +95,15 @@ export interface PatientProfileCreateRequest {
 export const receptionistApi = {
   // Wards
   getWards: () => api.get<WardResponse[]>("/api/wards"),
+  createWard: (body: WardCreateRequest) => api.post<WardResponse>("/api/wards", body),
+  updateWard: (id: number, body: WardCreateRequest) => api.put<WardResponse>(`/api/wards/${id}`, body),
+  deleteWard: (id: number) => api.delete<void>(`/api/wards/${id}`),
 
   // Rooms
   getRooms: () => api.get<RoomResponse[]>("/api/rooms"),
+  createRoom: (body: RoomCreateRequest) => api.post<RoomResponse>("/api/rooms", body),
+  updateRoom: (id: number, body: RoomCreateRequest) => api.put<RoomResponse>(`/api/rooms/${id}`, body),
+  deleteRoom: (id: number) => api.delete<void>(`/api/rooms/${id}`),
   getAvailableRooms: () => api.get<RoomResponse[]>("/api/rooms/available"),
   updateRoomStatus: (id: number, status: string) => 
     api.put<RoomResponse>(`/api/rooms/${id}/status?status=${status}`, {}),

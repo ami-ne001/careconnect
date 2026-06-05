@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { DoorOpen } from "lucide-react";
+import { DoorOpen, Plus, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
@@ -53,6 +53,12 @@ export function OperatingRooms() {
   const [error, setError] = useState<string | null>(null);
   const [updatingRoomId, setUpdatingRoomId] = useState<number | null>(null);
 
+  // Create OR state
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [newOrName, setNewOrName] = useState("");
+  const [newOrNotes, setNewOrNotes] = useState("");
+  const [creating, setCreating] = useState(false);
+
   const loadOverview = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -90,6 +96,23 @@ export function OperatingRooms() {
     }
   };
 
+  const handleCreateOr = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrName.trim()) return;
+    setCreating(true);
+    try {
+      await clinicalApi.createOperatingRoom(newOrName, newOrNotes);
+      setCreateModalOpen(false);
+      setNewOrName("");
+      setNewOrNotes("");
+      await loadOverview();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to create operating room."));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const stats = overview?.stats;
   const rooms = overview?.rooms ?? [];
   const week = overview?.weekSchedule;
@@ -99,6 +122,14 @@ export function OperatingRooms() {
       <PageHeader
         title="Operating Rooms"
         subtitle="Real-time OR availability and scheduling"
+        actions={
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90 transition-all cursor-pointer"
+          >
+            <Plus size={15} /> Add New OR
+          </button>
+        }
       />
 
       {error && (
@@ -342,6 +373,71 @@ export function OperatingRooms() {
           )}
         </div>
       </div>
+
+      {/* Create OR Modal */}
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !creating && setCreateModalOpen(false)} />
+          <div className="bg-white rounded-2xl w-full max-w-md relative shadow-2xl flex flex-col" style={{ maxHeight: "calc(100vh - 2rem)" }}>
+            <div className="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+              <h3 className="font-semibold text-[#0F172A] text-lg">Add Operating Room</h3>
+              <button
+                disabled={creating}
+                onClick={() => setCreateModalOpen(false)}
+                className="p-2 -mr-2 text-[#64748B] hover:bg-[#F1F5F9] rounded-full transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateOr} className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#0F172A] mb-1">Room Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  value={newOrName}
+                  onChange={e => setNewOrName(e.target.value)}
+                  placeholder="e.g. OR-1, Cardiac Suite"
+                  className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#0F172A] mb-1">Notes (Optional)</label>
+                <textarea
+                  value={newOrNotes}
+                  onChange={e => setNewOrNotes(e.target.value)}
+                  placeholder="Equipment notes, location, etc."
+                  rows={3}
+                  className="w-full p-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={() => setCreateModalOpen(false)}
+                  className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B] hover:bg-[#F8FAFC] transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating || !newOrName.trim()}
+                  className="flex-1 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                  {creating ? (
+                    <><span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> Creating...</>
+                  ) : (
+                    "Create Room"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
