@@ -61,6 +61,7 @@ export interface SurgeryResponse {
   specialEquipment?: string;
   createdAt: string;
   updatedAt: string;
+  price?: number;
 }
 
 export interface AuditActivityResponse {
@@ -394,6 +395,12 @@ export const clinicalApi = {
 
   addPostOpNotes: (id: number, body: { postOpNotes: string; outcome: string }) =>
     api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}/post-op`, body),
+
+  getSurgeriesByStatus: (status: string) =>
+    api.get<SurgeryResponse[]>(`/api/clinical/surgeries/status/${status}`),
+
+  setSurgeryPrice: (id: number, price: number) =>
+    api.put<SurgeryResponse>(`/api/clinical/surgeries/${id}/price`, { price }),
 
   // Doctor Profiles
   getDoctorProfile: (userId: number) =>

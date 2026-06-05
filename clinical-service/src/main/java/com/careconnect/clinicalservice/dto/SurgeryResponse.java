@@ -4,7 +4,9 @@ import com.careconnect.clinicalservice.enums.SurgeryOutcome;
 import com.careconnect.clinicalservice.enums.SurgeryPriority;
 import com.careconnect.clinicalservice.enums.SurgeryStatus;
 import lombok.*;
+import lombok.*;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Data
 @Builder
@@ -32,4 +34,5 @@ public class SurgeryResponse {
     private String specialEquipment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private BigDecimal price;
 }

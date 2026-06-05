@@ -118,6 +118,57 @@ public class InvoiceService {
         return mapToResponse(invoiceRepository.save(invoice));
     }
 
+    @Transactional
+    public InvoiceResponse addSurgeryChargesToInvoice(Long surgeryId, Long patientId, Long admissionId, String surgeryType, BigDecimal price) {
+        log.info("Adding surgery charges for surgery ID: {}", surgeryId);
+
+        // Try to find an existing invoice linked to the admission, then fall back to any patient invoice, or create a new one
+        Invoice invoice;
+        if (admissionId != null) {
+            invoice = invoiceRepository.findByAdmissionId(admissionId)
+                    .orElseGet(() -> {
+                        Invoice newInvoice = Invoice.builder()
+                                .patientId(patientId)
+                                .admissionId(admissionId)
+                                .surgeryId(surgeryId)
+                                .notes("Auto-generated for surgery")
+                                .status(InvoiceStatus.PENDING)
+                                .build();
+                        return invoiceRepository.save(newInvoice);
+                    });
+        } else {
+            // No admission — create a standalone surgery invoice
+            Invoice newInvoice = Invoice.builder()
+                    .patientId(patientId)
+                    .surgeryId(surgeryId)
+                    .notes("Auto-generated for surgery: " + surgeryType)
+                    .status(InvoiceStatus.PENDING)
+                    .build();
+            invoice = invoiceRepository.save(newInvoice);
+        }
+
+        // Avoid duplicate surgery charges
+        boolean chargeAlreadyExists = invoice.getItems().stream()
+                .anyMatch(item -> item.getDescription().startsWith("Surgery -"));
+
+        if (!chargeAlreadyExists) {
+            InvoiceItem item = InvoiceItem.builder()
+                    .invoice(invoice)
+                    .description("Surgery - " + surgeryType)
+                    .quantity(1)
+                    .unitPrice(price)
+                    .build();
+
+            invoiceItemRepository.save(item);
+            invoice.getItems().add(item);
+
+            recalculateTotalAmount(invoice);
+            invoice = invoiceRepository.save(invoice);
+        }
+
+        return mapToResponse(invoice);
+    }
+
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoiceById(Long id) {
         Invoice invoice = invoiceRepository.findById(id)

@@ -37,8 +37,6 @@ public class EventListener {
         log.info("Received PatientDischargedEvent for admission ID: {}", event.getAdmissionId());
         
         try {
-            // patient-service does not send nights or price. In a full system, we'd query the patient-service.
-            // Here we use default values to ensure the room charge is generated.
             Long nights = 1L;
             BigDecimal price = new BigDecimal("150.00");
             
@@ -50,6 +48,23 @@ public class EventListener {
             );
         } catch (Exception e) {
             log.error("Error processing PatientDischargedEvent: {}", e.getMessage(), e);
+        }
+    }
+
+    @RabbitListener(queues = RabbitMQConfig.SURGERY_BILLED_QUEUE)
+    public void handleSurgeryBilled(SurgeryBilledEvent event) {
+        log.info("Received SurgeryBilledEvent for surgery ID: {}", event.getSurgeryId());
+
+        try {
+            invoiceService.addSurgeryChargesToInvoice(
+                    event.getSurgeryId(),
+                    event.getPatientId(),
+                    event.getAdmissionId(),
+                    event.getSurgeryType(),
+                    event.getPrice()
+            );
+        } catch (Exception e) {
+            log.error("Error processing SurgeryBilledEvent: {}", e.getMessage(), e);
         }
     }
 }

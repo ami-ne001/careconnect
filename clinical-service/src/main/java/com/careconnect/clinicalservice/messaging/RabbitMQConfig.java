@@ -19,6 +19,7 @@ public class RabbitMQConfig {
     public static final String ROUTING_KEY_DOCTOR_USER_CREATED = "doctor.user.created";
     public static final String ROUTING_KEY_CONSULTATION_CLOSED = "consultation.closed";
     public static final String ROUTING_KEY_SURGERY_SCHEDULED = "surgery.scheduled";
+    public static final String ROUTING_KEY_SURGERY_BILLED = "surgery.billed";
 
     @Bean
     public TopicExchange careConnectExchange() {
