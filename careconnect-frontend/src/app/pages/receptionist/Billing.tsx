@@ -250,7 +250,7 @@ export function ReceptionistBilling() {
                       <tr><td colSpan={7} className="p-8 text-center text-[#64748B]">No completed surgeries pending billing.</td></tr>
                     ) : (
                       surgeries.map((s, i) => {
-                        const patient = patients.find(p => p.id === s.patientId);
+                        const patient = patients.find(p => p.userId === s.patientId);
                         const patientName = patient ? getPatientDisplayName(patient) : `Patient #${s.patientId}`;
                         const isBilled = s.price != null && s.price > 0;
                         return (

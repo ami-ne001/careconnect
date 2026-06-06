@@ -99,7 +99,7 @@ export function AdmissionsManagement() {
     }
     setSubmitting(true);
     try {
-      const patientProfile = patients.find(p => p.id === Number(selectedPatientId));
+      const patientProfile = patients.find(p => p.userId === Number(selectedPatientId));
       if (!patientProfile) return;
 
       const { data: admissionData } = await receptionistApi.admitPatient({
@@ -335,7 +335,7 @@ export function AdmissionsManagement() {
                   >
                     <option value="">— Select Patient —</option>
                     {patients.map((p) => (
-                      <option key={p.id} value={p.id}>{getPatientDisplayName(p.id)} (ID #{p.id})</option>
+                      <option key={p.userId} value={p.userId}>{getPatientDisplayName(p.userId)} (User ID #{p.userId})</option>
                     ))}
                   </select>
                 </div>

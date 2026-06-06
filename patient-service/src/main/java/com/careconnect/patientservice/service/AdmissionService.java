@@ -68,7 +68,7 @@ public class AdmissionService {
 
         // 2. Create admission record
         Admission admission = Admission.builder()
-                .patientId(patient.getId())
+                .patientId(patient.getUserId())
                 .admittingDoctorId(request.getAdmittingDoctorId())
                 .room(room)
                 .bedNumber(request.getBedNumber())
@@ -84,7 +84,7 @@ public class AdmissionService {
         // 3. Publish PatientAdmittedEvent
         try {
             PatientAdmittedEvent admittedEvent = PatientAdmittedEvent.builder()
-                    .patientId(patient.getId())
+                    .patientId(patient.getUserId())
                     .admissionId(saved.getId())
                     .roomNumber(room.getRoomNumber())
                     .wardName(room.getWard().getName())
@@ -128,7 +128,7 @@ public class AdmissionService {
         PatientProfile patient = patientProfileRepository.findByUserId(patientId)
                 .orElseGet(() -> patientProfileRepository.findById(patientId)
                         .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found with id or userId: " + patientId)));
-        return admissionRepository.findByPatientId(patient.getId()).stream()
+        return admissionRepository.findByPatientId(patient.getUserId()).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -208,8 +208,8 @@ public class AdmissionService {
         }
 
         Room room = admission.getRoom();
-        PatientProfile patient = patientProfileRepository.findById(admission.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for patient id: " + admission.getPatientId()));
+        PatientProfile patient = patientProfileRepository.findByUserId(admission.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found for user id: " + admission.getPatientId()));
 
         // 1. Release room — only set AVAILABLE if this was the last active admission in the room
         long remainingInRoom = admissionRepository.countByRoomIdAndStatus(room.getId(), AdmissionStatus.ADMITTED);
@@ -232,7 +232,7 @@ public class AdmissionService {
         // 3. Publish PatientDischargedEvent
         try {
             PatientDischargedEvent dischargedEvent = PatientDischargedEvent.builder()
-                    .patientId(patient.getId())
+                    .patientId(patient.getUserId())
                     .admissionId(saved.getId())
                     .dischargedAt(saved.getActualDischargeDate())
                     .dischargeStatus(saved.getDischargeStatus().name())

@@ -55,7 +55,7 @@ export function SurgeryDetail() {
         setPostOpNotes(res.data.postOpNotes || "");
         setOutcome(res.data.outcome || "SUCCESSFUL");
         if (res.data.patientId) {
-          patientApi.getProfileById(res.data.patientId).then(pRes => {
+          patientApi.getProfileByUserId(res.data.patientId).then(pRes => {
             setPatient(pRes.data);
           }).catch(console.error);
         }

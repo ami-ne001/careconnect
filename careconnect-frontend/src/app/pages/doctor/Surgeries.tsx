@@ -245,7 +245,7 @@ export function DoctorSurgeries() {
         setSurgeries(res.data);
         const uniquePatientIds = Array.from(new Set(res.data.map(s => s.patientId)));
         uniquePatientIds.forEach(id => {
-          patientApi.getProfileById(id).then(pRes => {
+          patientApi.getProfileByUserId(id).then(pRes => {
             setPatients(prev => ({ ...prev, [id]: pRes.data }));
           }).catch(console.error);
         });
