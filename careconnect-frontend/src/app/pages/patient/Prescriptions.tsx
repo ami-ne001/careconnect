@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
-import { clinicalApi, patientApi, adminApi } from "@/api";
+import { clinicalApi, adminApi } from "@/api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -27,10 +27,7 @@ export function PatientPrescriptions() {
       })
       .catch(console.error);
 
-    patientApi.getProfileByUserId(userId)
-      .then(({ data: patProfile }) => {
-        return clinicalApi.getPrescriptionsByPatient(patProfile.id);
-      })
+    clinicalApi.getPrescriptionsByPatient(userId)
       .then(({ data }) => {
         setPrescriptions(data);
       })

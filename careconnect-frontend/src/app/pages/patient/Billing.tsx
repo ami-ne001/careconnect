@@ -3,7 +3,7 @@ import { Download, CreditCard, X, DollarSign, Clock, CheckCircle } from "lucide-
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { StatCard } from "../../components/ui/StatCard";
-import { billingApi, patientApi } from "@/api";
+import { billingApi } from "@/api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -12,7 +12,6 @@ import type { InvoiceResponse } from "@/api/billing.api";
 export function PatientBilling() {
   const { userId } = useAuth();
   const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
-  const [patientProfileId, setPatientProfileId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Payment states
@@ -23,9 +22,9 @@ export function PatientBilling() {
   const [submitting, setSubmitting] = useState(false);
   const [paySuccess, setPaySuccess] = useState(false);
 
-  const loadInvoices = (profileId: number) => {
+  const loadInvoices = (patientId: number) => {
     setLoading(true);
-    billingApi.getInvoicesByPatient(profileId)
+    billingApi.getInvoicesByPatient(patientId)
       .then(({ data }) => {
         setInvoices(data);
       })
@@ -39,16 +38,7 @@ export function PatientBilling() {
   useEffect(() => {
     if (!userId) return;
 
-    // Load patient profile to find ID
-    patientApi.getProfileByUserId(userId)
-      .then(({ data }) => {
-        setPatientProfileId(data.id);
-        loadInvoices(data.id);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    loadInvoices(userId);
   }, [userId]);
 
   const totalPaid = invoices
@@ -74,7 +64,7 @@ export function PatientBilling() {
         setPayModal(false);
         setPaySuccess(false);
         setSelectedInvoice(null);
-        if (patientProfileId) loadInvoices(patientProfileId);
+        if (userId) loadInvoices(userId);
       }, 1800);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to record payment."));
@@ -287,7 +277,6 @@ export function PatientBilling() {
                       <input
                         type="text"
                         placeholder="Card Number"
-                        defaultValue="**** **** **** 4821"
                         className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/20 focus:border-[#0EA5E9] transition-all shadow-sm bg-white"
                       />
                     </div>
@@ -299,7 +288,6 @@ export function PatientBilling() {
                         <input
                           type="text"
                           placeholder="MM/YY"
-                          defaultValue="08/27"
                           className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/20 focus:border-[#0EA5E9] transition-all shadow-sm bg-white"
                         />
                       </div>
@@ -310,7 +298,6 @@ export function PatientBilling() {
                         <input
                           type="text"
                           placeholder="123"
-                          defaultValue="•••"
                           className="w-full h-11 pl-10 pr-4 rounded-xl border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/20 focus:border-[#0EA5E9] transition-all shadow-sm bg-white"
                         />
                       </div>
