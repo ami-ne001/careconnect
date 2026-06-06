@@ -435,13 +435,13 @@ export function DoctorConsultations() {
     if (!consultation || !activeAppt || !userId) return;
 
     // Validate prescription if any medication is typed
-    const hasMedication = rxItems.some((it) => it.medication.trim());
-    if (hasMedication) {
-      const valid = rxItems.every(
-        (it) => it.medication.trim() && it.dosage.trim() && it.frequency.trim()
+    const validItems = rxItems.filter((it) => it.medication.trim() !== "");
+    if (validItems.length > 0) {
+      const isValid = validItems.every(
+        (it) => it.dosage.trim() && it.frequency.trim()
       );
-      if (!valid) {
-        toast.error("Please fill in medication name, dosage, and frequency for all prescribed items.");
+      if (!isValid) {
+        toast.error("Please fill in dosage and frequency for all prescribed medications.");
         return;
       }
     }
@@ -465,12 +465,12 @@ export function DoctorConsultations() {
       }
 
       // 2. Save Prescription if medications are specified
-      if (hasMedication) {
+      if (validItems.length > 0) {
         await clinicalApi.createPrescription({
           consultationId: consultation.id,
           patientId: activeAppt.patientId,
           notes: rxNotes,
-          items: rxItems.map((it) => ({
+          items: validItems.map((it) => ({
             ...it,
             quantity: it.quantity || 1, // ensure quantity is specified
           })),

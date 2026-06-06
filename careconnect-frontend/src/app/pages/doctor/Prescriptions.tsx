@@ -32,7 +32,7 @@ export function DoctorPrescriptions() {
         // Fetch patient profiles
         const pIds = Array.from(new Set(allRx.map(rx => rx.patientId)));
         pIds.forEach(id => {
-          patientApi.getProfileById(id).then(p => setPatients(prev => ({ ...prev, [id]: p.data }))).catch(() => {});
+          patientApi.getProfileByUserId(id).then(p => setPatients(prev => ({ ...prev, [id]: p.data }))).catch(() => {});
         });
         setLoading(false);
       });
@@ -55,11 +55,6 @@ export function DoctorPrescriptions() {
       <PageHeader
         title="Prescriptions"
         subtitle="Manage patient prescriptions"
-        actions={
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1E3A5F] text-white text-sm font-medium hover:opacity-90">
-            <Plus size={15} />New Prescription
-          </button>
-        }
       />
 
       <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-[#E2E8F0] mb-5 w-fit" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
@@ -80,7 +75,7 @@ export function DoctorPrescriptions() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-                    {["Patient", "Medication", "Dosage", "Frequency", "Issued", "Status", ""].map((h) => (
+                    {["Patient", "Medication", "Dosage", "Frequency", "Issued", "Status"].map((h) => (
                       <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wider text-[#64748B] font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -94,7 +89,6 @@ export function DoctorPrescriptions() {
                       <td className="px-4 py-3.5 text-[#64748B]">{rx.items[0]?.frequency || "—"}</td>
                       <td className="px-4 py-3.5 text-[#64748B]">{new Date(rx.issuedAt).toLocaleDateString()}</td>
                       <td className="px-4 py-3.5"><Badge variant={rx.status === "ACTIVE" ? "active" : "completed"} dot>{rx.status}</Badge></td>
-                      <td className="px-4 py-3.5 text-right"><button className="text-xs text-[#0EA5E9] font-medium">Select</button></td>
                     </tr>
                   ))}
                   {filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-sm text-[#64748B] text-center">No prescriptions found.</td></tr>}
@@ -140,39 +134,7 @@ export function DoctorPrescriptions() {
         </div>
       )}
 
-      {/* New Prescription modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-bold text-[#0F172A]">New Prescription</h3>
-              <button onClick={() => setShowModal(false)}><X size={18} className="text-[#64748B]" /></button>
-            </div>
-            <div className="space-y-4">
-              {[
-                { label: "Patient", placeholder: "Search patient name..." },
-                { label: "Medication Name", placeholder: "e.g. Amlodipine 5mg" },
-                { label: "Dosage", placeholder: "e.g. 1 tablet" },
-                { label: "Frequency", placeholder: "e.g. Once daily" },
-                { label: "Duration", placeholder: "e.g. 30 days" },
-              ].map((f) => (
-                <div key={f.label}>
-                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">{f.label}</label>
-                  <input placeholder={f.placeholder} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
-                </div>
-              ))}
-              <div>
-                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Notes</label>
-                <textarea rows={2} className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B]">Cancel</button>
-                <button onClick={() => setShowModal(false)} className="flex-1 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold hover:opacity-90">Submit</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal removed */}
     </div>
   );
 }
