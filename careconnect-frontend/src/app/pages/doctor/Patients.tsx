@@ -22,7 +22,7 @@ export function DoctorPatients() {
     clinicalApi.getConsultationsByDoctor(userId).then(r => {
       setConsultations(r.data);
       const uniqueIds = Array.from(new Set(r.data.map(c => c.patientId)));
-      Promise.all(uniqueIds.map(id => patientApi.getProfileById(id).then(p => p.data).catch(() => null)))
+      Promise.all(uniqueIds.map(id => patientApi.getProfileByUserId(id).then(p => p.data).catch(() => null)))
         .then(results => {
           setPatientList(results.filter(Boolean) as PatientProfileResponse[]);
           setLoading(false);

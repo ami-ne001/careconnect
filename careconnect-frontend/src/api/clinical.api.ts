@@ -216,6 +216,8 @@ export interface VitalsResponse {
 export interface VitalsCreateRequest {
   patientId: number;
   consultationId?: number;
+  admissionId?: number;
+  surgeryId?: number;
   bpSystolic?: number;
   bpDiastolic?: number;
   heartRate?: number;
@@ -383,6 +385,9 @@ export const clinicalApi = {
 
   getSurgery: (id: number) =>
     api.get<SurgeryResponse>(`/api/clinical/surgeries/${id}`),
+
+  getSurgeriesByPatient: (patientId: number) =>
+    api.get<SurgeryResponse[]>(`/api/clinical/surgeries/patient/${patientId}`),
 
   getSurgeriesBySurgeon: (surgeonId: number) =>
     api.get<SurgeryResponse[]>(`/api/clinical/surgeries/surgeon/${surgeonId}`),
