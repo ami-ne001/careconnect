@@ -31,25 +31,38 @@ export function PatientProfile() {
     if (!id) return;
     setLoading(true);
     const pid = Number(id);
-    Promise.all([
-      patientApi.getProfileById(pid).catch(() => ({ data: null })),
-      clinicalApi.getVitalsByPatient(pid).catch(() => ({ data: [] })),
-      clinicalApi.getConsultationsByPatient(pid).catch(() => ({ data: [] })),
-      clinicalApi.getPrescriptionsByPatient(pid).catch(() => ({ data: [] })),
-      clinicalApi.getSurgeriesByPatient(pid).catch(() => ({ data: [] })),
-      patientApi.getAdmissionsByPatientId(pid).catch(() => ({ data: [] })),
-      labApi.getLabRequestsByPatient(pid).catch(() => ({ data: [] })),
-      billingApi.getInvoicesByPatient(pid).catch(() => ({ data: [] }))
-    ]).then(([pRes, vRes, cRes, rxRes, surgRes, admRes, labRes, invRes]) => {
-      setPatient(pRes.data);
-      setVitals(vRes.data || []);
-      setConsultations(cRes.data || []);
-      setPrescriptions(rxRes.data || []);
-      setSurgeries(surgRes.data || []);
-      setAdmissions(admRes.data || []);
-      setLabRequests(labRes.data || []);
-      setInvoices(invRes.data || []);
-    }).finally(() => setLoading(false));
+    
+    patientApi.getProfileById(pid)
+      .then(pRes => {
+        const pData = pRes.data;
+        setPatient(pData);
+        if (pData && pData.userId) {
+          const uid = pData.userId;
+          Promise.all([
+            clinicalApi.getVitalsByPatient(uid).catch(() => ({ data: [] })),
+            clinicalApi.getConsultationsByPatient(uid).catch(() => ({ data: [] })),
+            clinicalApi.getPrescriptionsByPatient(uid).catch(() => ({ data: [] })),
+            clinicalApi.getSurgeriesByPatient(uid).catch(() => ({ data: [] })),
+            patientApi.getAdmissionsByPatientId(uid).catch(() => ({ data: [] })),
+            labApi.getLabRequestsByPatient(uid).catch(() => ({ data: [] })),
+            billingApi.getInvoicesByPatient(uid).catch(() => ({ data: [] }))
+          ]).then(([vRes, cRes, rxRes, surgRes, admRes, labRes, invRes]) => {
+            setVitals(vRes.data || []);
+            setConsultations(cRes.data || []);
+            setPrescriptions(rxRes.data || []);
+            setSurgeries(surgRes.data || []);
+            setAdmissions(admRes.data || []);
+            setLabRequests(labRes.data || []);
+            setInvoices(invRes.data || []);
+          }).finally(() => setLoading(false));
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        setPatient(null);
+        setLoading(false);
+      });
   }, [id]);
 
   if (loading) {
@@ -145,8 +158,7 @@ export function PatientProfile() {
               <Badge variant="active" dot>Active</Badge>
             </div>
             <p className="text-sm text-[#64748B] mb-3">
-              DOB: {patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : "—"} · 
-              Gender: {patient.gender || "—"} · Patient ID: {patient.id}
+              Patient ID: {patient.id}
             </p>
             <div className="flex flex-wrap gap-2 mb-2">
               <span className="text-xs font-medium text-[#64748B]">Allergies:</span>
@@ -156,15 +168,14 @@ export function PatientProfile() {
             </div>
             <div className="flex flex-wrap gap-2">
               <span className="text-xs font-medium text-[#64748B]">Conditions:</span>
-              {patient.conditions?.length ? patient.conditions.map(c => (
+              {patient.chronicConditions?.length ? patient.chronicConditions.map(c => (
                 <span key={c.id} className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">{c.conditionName}</span>
               )) : <span className="text-xs text-[#94A3B8]">None recorded</span>}
             </div>
           </div>
           <div className="text-right text-sm text-[#64748B]">
-            <p className="text-xs">📞 {patient.phoneNumber || "No phone"}</p>
-            <p className="mt-1 text-xs">✉️ {patient.email || "No email"}</p>
-            <p className="mt-1 text-xs">{patient.address || "No address"}</p>
+            <p className="text-xs">📞 {patient.emergencyContactPhone || "No emergency phone"}</p>
+            <p className="mt-1 text-xs">Emergency Contact: {patient.emergencyContactName || "None"}</p>
           </div>
         </div>
       </div>
@@ -283,8 +294,8 @@ export function PatientProfile() {
                     <span className="px-2.5 py-0.5 rounded-full bg-[#0EA5E9] text-white text-xs font-bold">Currently Admitted</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                    <div><p className="text-xs text-[#94A3B8]">Ward</p><p className="font-semibold text-[#0F172A]">{currentAdmission.wardName || "—"}</p></div>
-                    <div><p className="text-xs text-[#94A3B8]">Room</p><p className="font-semibold text-[#0F172A]">{currentAdmission.roomNumber || "—"}</p></div>
+                    <div><p className="text-xs text-[#94A3B8]">Ward</p><p className="font-semibold text-[#0F172A]">{currentAdmission.room?.wardName || "—"}</p></div>
+                    <div><p className="text-xs text-[#94A3B8]">Room</p><p className="font-semibold text-[#0F172A]">{currentAdmission.room?.roomNumber || "—"}</p></div>
                     <div><p className="text-xs text-[#94A3B8]">Admitted</p><p className="font-semibold text-[#0F172A]">{new Date(currentAdmission.admissionDate).toLocaleDateString()}</p></div>
                     <div><p className="text-xs text-[#94A3B8]">Status</p><p className="font-semibold text-[#0F172A]">{currentAdmission.status}</p></div>
                   </div>
@@ -313,10 +324,9 @@ export function PatientProfile() {
                   ) : admissions.map((a, i) => (
                     <tr key={a.id} className={`border-b border-[#F1F5F9] ${i % 2 === 0 ? "" : "bg-[#FAFBFC]"}`}>
                       <td className="px-5 py-3.5 text-[#0F172A] font-medium whitespace-nowrap">{new Date(a.admissionDate).toLocaleDateString()}</td>
-                      <td className="px-5 py-3.5 text-[#64748B] whitespace-nowrap">{a.dischargeDate ? new Date(a.dischargeDate).toLocaleDateString() : "—"}</td>
-                      <td className="px-5 py-3.5 text-[#64748B] whitespace-nowrap">{a.wardName || "—"}</td>
-                      <td className="px-5 py-3.5 text-[#64748B]">{a.roomNumber || "—"}</td>
-                      <td className="px-5 py-3.5 text-[#64748B]">{a.reasonForAdmission || "—"}</td>
+                      <td className="px-5 py-3.5 text-[#64748B] whitespace-nowrap">{a.room?.wardName || "—"}</td>
+                      <td className="px-5 py-3.5 text-[#64748B]">{a.room?.roomNumber || "—"}</td>
+                      <td className="px-5 py-3.5 text-[#64748B]">{a.admissionReason || "—"}</td>
                       <td className="px-5 py-3.5"><Badge variant={a.status === "DISCHARGED" ? "completed" : "active"}>{a.status}</Badge></td>
                     </tr>
                   ))}
