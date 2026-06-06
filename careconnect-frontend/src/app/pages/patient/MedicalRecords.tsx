@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Eye, X } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { clinicalApi, patientApi } from "@/api";
+import { clinicalApi } from "@/api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -28,21 +28,17 @@ export function PatientMedicalRecords() {
   useEffect(() => {
     if (!userId) return;
 
-    patientApi.getProfileByUserId(userId)
-      .then(async ({ data: patProfile }) => {
-        const patientId = patProfile.id;
-
-        // Fetch consultations, prescriptions, and documents in parallel
-        const [
-          { data: consultations },
-          { data: prescriptions },
-          { data: documents }
-        ] = await Promise.all([
-          clinicalApi.getConsultationsByPatient(patientId),
-          clinicalApi.getPrescriptionsByPatient(patientId),
-          clinicalApi.getDocumentsByPatient(patientId)
-        ]);
-
+    // Fetch consultations, prescriptions, and documents in parallel
+    Promise.all([
+      clinicalApi.getConsultationsByPatient(userId),
+      clinicalApi.getPrescriptionsByPatient(userId),
+      clinicalApi.getDocumentsByPatient(userId)
+    ])
+      .then(([
+        { data: consultations },
+        { data: prescriptions },
+        { data: documents }
+      ]) => {
         const items: RecordItem[] = [];
 
         // 1. Map Consultations

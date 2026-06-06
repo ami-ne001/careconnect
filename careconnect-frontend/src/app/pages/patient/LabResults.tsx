@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
-import { labApi, patientApi } from "@/api";
+import { labApi } from "@/api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -21,10 +21,8 @@ export function PatientLabResults() {
   useEffect(() => {
     if (!userId) return;
 
-    patientApi.getProfileByUserId(userId)
-      .then(async ({ data: patProfile }) => {
-        const { data: reqs } = await labApi.getLabRequestsByPatient(patProfile.id);
-        
+    labApi.getLabRequestsByPatient(userId)
+      .then(async ({ data: reqs }) => {
         // Fetch results for completed requests
         const reqsWithResults = await Promise.all(
           reqs.map(async (req) => {
