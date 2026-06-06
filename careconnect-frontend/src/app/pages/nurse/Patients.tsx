@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../../store/useAuth";
@@ -8,6 +9,7 @@ import { receptionistApi, AdmissionResponse } from "../../../api/receptionist.ap
 import type { PatientProfileResponse } from "../../../types/patient.types";
 
 export function NursePatients() {
+  const navigate = useNavigate();
   const { userId } = useAuth();
   const [admissions, setAdmissions] = useState<AdmissionResponse[]>([]);
   const [patients, setPatients] = useState<Record<number, PatientProfileResponse>>({});
@@ -83,8 +85,8 @@ export function NursePatients() {
                       <td className="px-5 py-3.5"><Badge variant={status as any} dot>{status}</Badge></td>
                       <td className="px-5 py-3.5">
                         <div className="flex gap-2">
-                          <button className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0F172A] hover:bg-[#F0F4F8]">View</button>
-                          <button className="px-3 py-1.5 rounded-lg bg-[#0EA5E9]/10 text-[#0EA5E9] text-xs font-medium hover:bg-[#0EA5E9]/20">Record Vitals</button>
+                          <button onClick={() => navigate('/nurse/care-tasks')} className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-medium text-[#0F172A] hover:bg-[#F0F4F8]">View Tasks</button>
+                          <button onClick={() => navigate('/nurse/vitals-monitoring')} className="px-3 py-1.5 rounded-lg bg-[#0EA5E9]/10 text-[#0EA5E9] text-xs font-medium hover:bg-[#0EA5E9]/20">Record Vitals</button>
                         </div>
                       </td>
                     </tr>

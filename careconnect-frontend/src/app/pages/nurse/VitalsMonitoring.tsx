@@ -6,6 +6,8 @@ import { clinicalApi, VitalsResponse } from "../../../api/clinical.api";
 import { patientApi } from "../../../api/patient.api";
 import { receptionistApi, AdmissionResponse } from "../../../api/receptionist.api";
 import type { PatientProfileResponse } from "../../../types/patient.types";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "../../../utils/apiError";
 
 const borderMap: Record<string, string> = { stable: "border-emerald-200", watch: "border-amber-200", critical: "border-red-200" };
 const dotMap: Record<string, string> = { stable: "bg-emerald-500", watch: "bg-amber-500", critical: "bg-red-500" };
@@ -19,10 +21,15 @@ export function NurseVitals() {
 
   const [showModal, setShowModal] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  
+  const [form, setForm] = useState({
+    bpSystolic: "", bpDiastolic: "", heartRate: "",
+    temperature: "", oxygenSat: "", weight: "", notes: ""
+  });
 
   useEffect(() => {
     if (!userId) return;
-    // Get active admissions for patients this nurse is caring for
     clinicalApi.getCareTasksAssignedTo(userId).then(r => {
       const patientIds = Array.from(new Set(r.data.map(t => t.patientId)));
       Promise.all(patientIds.map(id => patientApi.getAdmissionsByPatientId(id).then(a => a.data).catch(() => [])))
@@ -56,6 +63,37 @@ export function NurseVitals() {
     return "stable";
   };
 
+  const handleSaveVitals = async () => {
+    if (!selectedPatientId) return toast.error("Please select a patient");
+    setSubmitting(true);
+    try {
+      const admission = admissions.find(a => a.patientId.toString() === selectedPatientId);
+      
+      await clinicalApi.recordVitals({
+        patientId: Number(selectedPatientId),
+        admissionId: admission ? admission.id : undefined,
+        bpSystolic: form.bpSystolic ? Number(form.bpSystolic) : undefined,
+        bpDiastolic: form.bpDiastolic ? Number(form.bpDiastolic) : undefined,
+        heartRate: form.heartRate ? Number(form.heartRate) : undefined,
+        temperature: form.temperature ? Number(form.temperature) : undefined,
+        oxygenSat: form.oxygenSat ? Number(form.oxygenSat) : undefined,
+        weightKg: form.weight ? Number(form.weight) : undefined,
+        notes: form.notes || undefined
+      });
+      toast.success("Vitals recorded successfully!");
+      setShowModal(false);
+      setForm({ bpSystolic: "", bpDiastolic: "", heartRate: "", temperature: "", oxygenSat: "", weight: "", notes: "" });
+      
+      clinicalApi.getLatestVitalsByPatient(Number(selectedPatientId))
+        .then(v => setVitals(prev => ({ ...prev, [Number(selectedPatientId)]: v.data })))
+        .catch(() => {});
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to record vitals"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const critical = admissions.filter(a => getOverallStatus(a.patientId) === "critical");
 
   return (
@@ -70,7 +108,6 @@ export function NurseVitals() {
         }
       />
 
-      {/* Alert bar */}
       {critical.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 mb-5 flex items-center gap-3">
           <AlertTriangle size={18} className="text-[#EF4444] shrink-0" />
@@ -105,7 +142,7 @@ export function NurseVitals() {
                 </div>
                 <div className="grid grid-cols-4 gap-2 mb-3">
                   {[
-                    { l: "BP", v: v ? `${v.bpSystolic}/${v.bpDiastolic}` : "—", u: "" },
+                    { l: "BP", v: v ? `${v.bpSystolic || '—'}/${v.bpDiastolic || '—'}` : "—", u: "" },
                     { l: "HR", v: v?.heartRate || "—", u: "bpm" },
                     { l: "Temp", v: v?.temperature || "—", u: "°C" },
                     { l: "O₂", v: v?.oxygenSat || "—", u: "%" },
@@ -117,7 +154,6 @@ export function NurseVitals() {
                     </div>
                   ))}
                 </div>
-                {/* Sparkline placeholder */}
                 <div className="h-8 bg-[#F0F4F8] rounded mb-3 flex items-center justify-center overflow-hidden">
                   <svg viewBox="0 0 120 30" className="w-full h-full" preserveAspectRatio="none">
                     <polyline points="0,20 15,15 30,18 45,12 60,16 75,10 90,14 105,8 120,12" fill="none" stroke={status === "critical" ? "#EF4444" : status === "watch" ? "#F59E0B" : "#10B981"} strokeWidth="2" />
@@ -133,7 +169,6 @@ export function NurseVitals() {
         </div>
       )}
 
-      {/* Record Vitals Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
@@ -150,27 +185,40 @@ export function NurseVitals() {
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "BP Systolic", placeholder: "e.g. 128" },
-                  { label: "BP Diastolic", placeholder: "e.g. 84" },
-                  { label: "Heart Rate (bpm)", placeholder: "e.g. 78" },
-                  { label: "Temperature (°C)", placeholder: "e.g. 37.1" },
-                  { label: "O₂ Saturation (%)", placeholder: "e.g. 97" },
-                  { label: "Weight (kg)", placeholder: "e.g. 74" },
-                ].map((f) => (
-                  <div key={f.label}>
-                    <label className="block text-xs font-medium text-[#64748B] mb-1">{f.label}</label>
-                    <input placeholder={f.placeholder} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
-                  </div>
-                ))}
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1">BP Systolic</label>
+                  <input type="number" placeholder="e.g. 128" value={form.bpSystolic} onChange={e => setForm({...form, bpSystolic: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1">BP Diastolic</label>
+                  <input type="number" placeholder="e.g. 84" value={form.bpDiastolic} onChange={e => setForm({...form, bpDiastolic: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1">Heart Rate (bpm)</label>
+                  <input type="number" placeholder="e.g. 78" value={form.heartRate} onChange={e => setForm({...form, heartRate: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1">Temperature (°C)</label>
+                  <input type="number" step="0.1" placeholder="e.g. 37.1" value={form.temperature} onChange={e => setForm({...form, temperature: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1">O₂ Saturation (%)</label>
+                  <input type="number" placeholder="e.g. 97" value={form.oxygenSat} onChange={e => setForm({...form, oxygenSat: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1">Weight (kg)</label>
+                  <input type="number" step="0.1" placeholder="e.g. 74" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Notes</label>
-                <textarea rows={2} className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
+                <textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B]">Cancel</button>
-                <button onClick={() => setShowModal(false)} className="flex-1 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold">Save Vitals</button>
+                <button disabled={submitting} onClick={() => setShowModal(false)} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#64748B]">Cancel</button>
+                <button disabled={submitting} onClick={handleSaveVitals} className="flex-1 h-10 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold flex justify-center items-center">
+                  {submitting ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : "Save Vitals"}
+                </button>
               </div>
             </div>
           </div>
