@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Eye, X } from "lucide-react";
+import { Eye, X, Stethoscope, Pill, Activity, AlertCircle, HeartPulse } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-import { clinicalApi } from "@/api";
+import { clinicalApi, adminApi, patientApi } from "@/api";
 import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
@@ -9,7 +9,7 @@ import { getApiErrorMessage } from "@/utils/apiError";
 interface RecordItem {
   id: number;
   type: string;
-  icon: string;
+  icon: React.ReactNode;
   dateStr: string;
   dateObj: Date;
   doctor: string;
@@ -20,7 +20,8 @@ interface RecordItem {
 
 export function PatientMedicalRecords() {
   const { userId } = useAuth();
-  const [timeline, setTimeline] = useState<RecordItem[]>([]);
+  const [records, setRecords] = useState<RecordItem[]>([]);
+  const [doctors, setDoctors] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<RecordItem | null>(null);
   const [typeFilter, setTypeFilter] = useState("All");
@@ -28,17 +29,29 @@ export function PatientMedicalRecords() {
   useEffect(() => {
     if (!userId) return;
 
-    // Fetch consultations, prescriptions, and documents in parallel
-    Promise.all([
-      clinicalApi.getConsultationsByPatient(userId),
-      clinicalApi.getPrescriptionsByPatient(userId),
-      clinicalApi.getDocumentsByPatient(userId)
-    ])
-      .then(([
-        { data: consultations },
-        { data: prescriptions },
-        { data: documents }
-      ]) => {
+    const loadData = async () => {
+      try {
+        // 1. Fetch doctors mapping
+        const { data: usersData } = await adminApi.getUsers("DOCTOR");
+        const docMap: Record<number, string> = {};
+        usersData.forEach(d => {
+          docMap[d.id] = `Dr. ${d.firstName} ${d.lastName}`;
+        });
+        setDoctors(docMap);
+
+        // 2. Fetch medical records
+        const [
+          { data: consultations },
+          { data: prescriptions },
+          { data: vitals },
+          { data: patientProfile }
+        ] = await Promise.all([
+          clinicalApi.getConsultationsByPatient(userId),
+          clinicalApi.getPrescriptionsByPatient(userId),
+          clinicalApi.getVitalsByPatient(userId),
+          patientApi.getProfileByUserId(userId)
+        ]);
+
         const items: RecordItem[] = [];
 
         // 1. Map Consultations
@@ -46,13 +59,13 @@ export function PatientMedicalRecords() {
           items.push({
             id: c.id,
             type: "Consultation Notes",
-            icon: "🩺",
+            icon: <Stethoscope size={14} />,
             dateStr: new Date(c.startedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
             dateObj: new Date(c.startedAt),
-            doctor: `Dr. #${c.doctorId}`,
+            doctor: c.doctorId ? (docMap[c.doctorId] || `Dr. #${c.doctorId}`) : "Unknown Provider",
             title: c.diagnosis || "General Consultation",
             summary: `Chief Complaint: ${c.symptoms || "—"}\n\nClinical Notes: ${c.clinicalNotes || "None recorded."}`,
-            color: "bg-blue-100 text-blue-600"
+            color: "text-blue-600 bg-blue-50 border-blue-200"
           });
         });
 
@@ -62,57 +75,89 @@ export function PatientMedicalRecords() {
           items.push({
             id: p.id,
             type: "Prescription",
-            icon: "💊",
+            icon: <Pill size={14} />,
             dateStr: new Date(p.issuedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
             dateObj: new Date(p.issuedAt),
-            doctor: `Dr. #${p.doctorId}`,
+            doctor: p.doctorId ? (docMap[p.doctorId] || `Dr. #${p.doctorId}`) : "Unknown Provider",
             title: `Medication Order #${p.id}`,
             summary: `Prescribed Medications: ${itemsSummary || "None listed."}\n\nStatus: ${p.status}`,
-            color: "bg-green-100 text-green-600"
+            color: "text-emerald-600 bg-emerald-50 border-emerald-200"
           });
         });
 
-        // 3. Map Medical Documents (Lab reports, Imaging, summaries)
-        documents.forEach((d) => {
-          const isLab = d.documentType === "LAB_REPORT";
+        // 3. Map Vitals
+        vitals.forEach((v) => {
           items.push({
-            id: d.id,
-            type: isLab ? "Lab Report" : "Imaging",
-            icon: isLab ? "🔬" : "🫁",
-            dateStr: new Date(d.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-            dateObj: new Date(d.uploadedAt),
-            doctor: "Uploaded to Patient Profile",
-            title: d.title,
-            summary: d.notes || "No notes attached to this document file.",
-            color: isLab ? "bg-purple-100 text-purple-600" : "bg-orange-100 text-orange-600"
+            id: v.id,
+            type: "Vitals",
+            icon: <Activity size={14} />,
+            dateStr: new Date(v.recordedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            dateObj: new Date(v.recordedAt),
+            doctor: v.recordedBy ? (docMap[v.recordedBy] || `Nurse #${v.recordedBy}`) : "Clinical Staff",
+            title: `Vitals Reading #${v.id}`,
+            summary: `BP: ${v.bpSystolic || "—"}/${v.bpDiastolic || "—"} mmHg\nHeart Rate: ${v.heartRate || "—"} bpm\nTemp: ${v.temperature || "—"} °C\nO2 Sat: ${v.oxygenSat || "—"} %\nWeight: ${v.weightKg || "—"} kg · Height: ${v.heightCm || "—"} cm\nNotes: ${v.notes || "None"}`,
+            color: "text-purple-600 bg-purple-50 border-purple-200"
+          });
+        });
+
+        // 4. Map Allergies
+        patientProfile.allergies.forEach((a) => {
+          items.push({
+            id: a.id,
+            type: "Allergy",
+            icon: <AlertCircle size={14} />,
+            dateStr: "Active Record",
+            dateObj: new Date(), 
+            doctor: "Patient Profile",
+            title: `Allergy: ${a.allergen}`,
+            summary: `Severity: ${a.severity}\nReaction: ${a.reaction || "None specified"}`,
+            color: "text-red-600 bg-red-50 border-red-200"
+          });
+        });
+
+        // 5. Map Chronic Conditions
+        patientProfile.chronicConditions.forEach((c) => {
+          items.push({
+            id: c.id,
+            type: "Chronic Condition",
+            icon: <HeartPulse size={14} />,
+            dateStr: c.diagnosisDate ? new Date(c.diagnosisDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Active Record",
+            dateObj: c.diagnosisDate ? new Date(c.diagnosisDate) : new Date(),
+            doctor: "Patient Profile",
+            title: c.conditionName,
+            summary: `Notes: ${c.notes || "No additional notes."}`,
+            color: "text-rose-600 bg-rose-50 border-rose-200"
           });
         });
 
         // Sort chronologically (latest first)
         items.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
-        setTimeline(items);
-      })
-      .catch((err) => {
+        setRecords(items);
+      } catch (err) {
         toast.error(getApiErrorMessage(err, "Failed to load medical records."));
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [userId]);
 
-  const filtered = timeline.filter((r) => typeFilter === "All" || r.type === typeFilter);
+  const filtered = records.filter((r) => typeFilter === "All" || r.type === typeFilter);
 
   return (
     <div>
       <PageHeader title="Medical Records" subtitle="Your complete medical history" />
 
       <div className="flex gap-2 mb-6 flex-wrap">
-        {["All", "Consultation Notes", "Lab Report", "Prescription", "Imaging"].map((t) => (
+        {["All", "Consultation Notes", "Vitals", "Prescription", "Allergy", "Chronic Condition"].map((t) => (
           <button
             key={t}
             onClick={() => setTypeFilter(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
               typeFilter === t
-                ? "bg-[#1E3A5F] text-white"
-                : "bg-white border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A]"
+                ? "bg-[#1E3A5F] text-white shadow-sm"
+                : "bg-white border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]"
             }`}
           >
             {t}
@@ -123,88 +168,100 @@ export function PatientMedicalRecords() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <span className="animate-spin rounded-full h-8 w-8 border-4 border-[#1E3A5F] border-t-transparent" />
-          <span className="text-sm text-[#64748B]">Compiling your health timeline…</span>
+          <span className="text-sm text-[#64748B]">Compiling your health records…</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center text-[#64748B]">
           No medical records found in this category.
         </div>
       ) : (
-        /* Timeline */
-        <div className="relative">
-          <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-[#E2E8F0]" />
-          <div className="space-y-5 pl-14">
-            {filtered.map((r, i) => (
-              <div key={i} className="relative">
-                <div
-                  className={`absolute -left-9 top-3 w-10 h-10 rounded-full ${r.color} flex items-center justify-center text-base border-2 border-white`}
-                  style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
-                >
-                  {r.icon}
-                </div>
-                <div
-                  className="bg-white rounded-xl p-5 border border-[#E2E8F0] hover:shadow-md transition-all"
-                  style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">{r.type}</span>
-                        <span className="text-[10px] text-[#64748B]">· {r.dateStr}</span>
+        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                  <th className="text-left px-5 py-4 text-xs uppercase tracking-wider text-[#64748B] font-semibold">Date</th>
+                  <th className="text-left px-5 py-4 text-xs uppercase tracking-wider text-[#64748B] font-semibold">Record Type</th>
+                  <th className="text-left px-5 py-4 text-xs uppercase tracking-wider text-[#64748B] font-semibold">Medical Provider</th>
+                  <th className="text-left px-5 py-4 text-xs uppercase tracking-wider text-[#64748B] font-semibold">Description</th>
+                  <th className="text-center px-5 py-4 text-xs uppercase tracking-wider text-[#64748B] font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F1F5F9]">
+                {filtered.map((r, i) => (
+                  <tr key={i} className="hover:bg-[#FAFBFC] transition-colors">
+                    <td className="px-5 py-4 text-[#64748B] whitespace-nowrap">{r.dateStr}</td>
+                    <td className="px-5 py-4">
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${r.color}`}>
+                        {r.icon}
+                        {r.type}
                       </div>
-                      <h4 className="font-semibold text-sm text-[#0F172A] mb-1">{r.title}</h4>
-                      <p className="text-xs text-[#64748B] leading-relaxed whitespace-pre-line truncate max-w-xl">
-                        {r.summary}
-                      </p>
-                      <p className="text-[10px] font-medium text-[#94A3B8] mt-2">{r.doctor}</p>
-                    </div>
-                    <button
-                      onClick={() => setSelected(r)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#0F172A] hover:bg-[#F0F4F8] shrink-0 cursor-pointer transition-colors"
-                    >
-                      <Eye size={12} />View Details
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-5 py-4 text-[#0F172A] font-medium">{r.doctor}</td>
+                    <td className="px-5 py-4 text-[#0F172A]">
+                      <p className="font-semibold mb-0.5">{r.title}</p>
+                      <p className="text-xs text-[#64748B] truncate max-w-xs">{r.summary.split('\n')[0]}</p>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <button
+                        onClick={() => setSelected(r)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#0EA5E9] hover:bg-[#F0F9FF] hover:border-[#BAE6FD] transition-colors cursor-pointer"
+                      >
+                        <Eye size={14} /> View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
       {/* Detail modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
-            <div className="flex items-start justify-between mb-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-5 border-b border-[#E2E8F0] pb-4">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl ${selected.color} flex items-center justify-center text-lg`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${selected.color.split(' ').slice(1).join(' ')}`}>
                   {selected.icon}
                 </div>
                 <div>
                   <p className="text-[10px] text-[#94A3B8] uppercase tracking-wider font-bold">{selected.type}</p>
-                  <h3 className="font-bold text-[#0F172A] text-base">{selected.title}</h3>
+                  <h3 className="font-bold text-[#0F172A] text-lg">{selected.title}</h3>
                 </div>
               </div>
-              <button className="cursor-pointer" onClick={() => setSelected(null)}>
-                <X size={18} className="text-[#64748B]" />
+              <button className="cursor-pointer hover:bg-gray-100 p-1.5 rounded-full transition-colors" onClick={() => setSelected(null)}>
+                <X size={20} className="text-[#64748B]" />
               </button>
             </div>
-            <div className="space-y-4 text-xs">
-              <div className="flex justify-between border-b border-[#F1F5F9] pb-2">
-                <span className="text-[#64748B] font-medium">Record Date:</span>
-                <span className="font-semibold text-[#0F172A]">{selected.dateStr}</span>
+            
+            <div className="grid grid-cols-2 gap-4 mb-5 text-sm bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4">
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Record Date</p>
+                <p className="font-semibold text-[#0F172A]">{selected.dateStr}</p>
               </div>
-              <div className="flex justify-between border-b border-[#F1F5F9] pb-2">
-                <span className="text-[#64748B] font-medium">Medical Provider:</span>
-                <span className="font-semibold text-[#0F172A]">{selected.doctor}</span>
+              <div>
+                <p className="text-xs text-[#64748B] mb-1">Medical Provider</p>
+                <p className="font-semibold text-[#0F172A]">{selected.doctor}</p>
               </div>
-              <div className="pb-2">
-                <p className="text-[#64748B] font-medium mb-1.5">Clinical Narrative & Details:</p>
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-4 rounded-xl text-[#0F172A] leading-relaxed whitespace-pre-line">
-                  {selected.summary}
-                </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-bold text-[#0F172A] mb-2">Clinical Narrative & Details</p>
+              <div className="bg-white border border-[#E2E8F0] p-4 rounded-xl text-[#475569] text-sm leading-relaxed whitespace-pre-line shadow-sm">
+                {selected.summary}
               </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setSelected(null)} 
+                className="px-5 py-2 rounded-lg bg-[#1E3A5F] text-white text-sm font-semibold hover:bg-[#162d4a] transition-colors cursor-pointer"
+              >
+                Close Details
+              </button>
             </div>
           </div>
         </div>
