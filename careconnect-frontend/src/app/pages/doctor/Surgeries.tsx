@@ -120,7 +120,7 @@ function ScheduleSurgeryModal({ onClose, onRefresh }: { onClose: () => void, onR
                 >
                   <option value="">Select a patient...</option>
                   {patients.map(p => (
-                    <option key={p.id} value={p.id}>{p.firstName} {p.lastName} (ID: {p.id})</option>
+                    <option key={p.userId} value={p.userId}>{p.firstName} {p.lastName} (ID: {p.userId})</option>
                   ))}
                 </select>
               </div>
