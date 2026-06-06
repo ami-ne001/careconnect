@@ -195,6 +195,7 @@ export function DoctorConsultations() {
     try {
       const body: AdmissionCreateRequest = {
         patientId: activeAppt.patientId,
+        userId: activeAppt.patientId,
         admittingDoctorId: userId,
         roomId: Number(admitForm.roomId),
         bedNumber: Number(admitForm.bedNumber) || 1,

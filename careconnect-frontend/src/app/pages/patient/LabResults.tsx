@@ -6,10 +6,11 @@ import { useAuth } from "@/store/useAuth";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/utils/apiError";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import type { LabRequestResponse, LabResultResponse } from "@/api/lab.api";
+import type { LabRequestResponse, LabResultResponse, ReferenceRangeResponse } from "@/api/lab.api";
 
 interface ExtendedLabRequest extends LabRequestResponse {
   result?: LabResultResponse | null;
+  ranges?: ReferenceRangeResponse[];
 }
 
 export function PatientLabResults() {
@@ -26,16 +27,25 @@ export function PatientLabResults() {
         // Fetch results for completed requests
         const reqsWithResults = await Promise.all(
           reqs.map(async (req) => {
+            let result = null;
+            let ranges: ReferenceRangeResponse[] = [];
+            
+            try {
+              const { data: rangeData } = await labApi.getReferenceRanges(req.testTypeId);
+              ranges = rangeData;
+            } catch (e) {
+              console.error(`Failed to fetch ranges for test type #${req.testTypeId}`, e);
+            }
+
             if (req.status === "COMPLETED") {
               try {
                 const { data: res } = await labApi.getResultByLabRequestId(req.id);
-                return { ...req, result: res };
+                result = res;
               } catch (err) {
                 console.error(`Failed to fetch result for lab request #${req.id}`, err);
-                return { ...req, result: null };
               }
             }
-            return { ...req, result: null };
+            return { ...req, result, ranges };
           })
         );
 
@@ -51,20 +61,44 @@ export function PatientLabResults() {
   }, [userId]);
 
   // Parse resultData JSON safely
-  const parseResultData = (resultDataRaw: string) => {
+  const parseResultData = (resultDataRaw: string, ranges?: ReferenceRangeResponse[]) => {
     try {
       const data = JSON.parse(resultDataRaw);
       return Object.entries(data).map(([name, val]) => {
-        // If val is an object, try to extract details
+        const rangeObj = ranges?.find(r => r.component.toLowerCase() === name.toLowerCase());
+
+        let u = "—";
+        let r = "—";
+        let normal = true;
+        let v = "";
+
+        // If val is an object, extract details
         if (typeof val === "object" && val !== null) {
-          const v = (val as any).value || "";
-          const u = (val as any).unit || "";
-          const r = (val as any).referenceRange || "";
-          const normal = (val as any).normal !== false;
-          return { name, value: v, unit: u, range: r, normal };
+           v = (val as any).value || "";
+           u = (val as any).unit || rangeObj?.unit || "—";
+           r = (val as any).referenceRange || (rangeObj ? `${rangeObj.minValue} - ${rangeObj.maxValue}` : "—");
+           
+           if ((val as any).normal !== undefined) {
+             normal = (val as any).normal !== false;
+           } else if (rangeObj) {
+             const numV = parseFloat(v);
+             if (!isNaN(numV)) {
+               normal = numV >= rangeObj.minValue && numV <= rangeObj.maxValue;
+             }
+           }
+        } else {
+           v = String(val);
+           if (rangeObj) {
+             u = rangeObj.unit;
+             r = `${rangeObj.minValue} - ${rangeObj.maxValue}`;
+             const numV = parseFloat(v);
+             if (!isNaN(numV)) {
+               normal = numV >= rangeObj.minValue && numV <= rangeObj.maxValue;
+             }
+           }
         }
-        // Otherwise just return as string value
-        return { name, value: String(val), unit: "—", range: "—", normal: true };
+
+        return { name, value: v, unit: u, range: r, normal };
       });
     } catch {
       // Return a single fallback entry if not JSON
@@ -90,8 +124,8 @@ export function PatientLabResults() {
           {requests.map((req) => {
             const isExpanded = expanded === req.id;
             const dt = new Date(req.requestedAt);
-            const formattedDate = dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-            const resultDetails = req.result ? parseResultData(req.result.resultData) : [];
+            const formattedDate = dt.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+            const resultDetails = req.result ? parseResultData(req.result.resultData, req.ranges) : [];
             const hasAbnormal = resultDetails.some((d) => !d.normal);
 
             return (
@@ -199,7 +233,7 @@ export function PatientLabResults() {
                         )}
                         <div className="px-5 py-4 bg-[#F8FAFC] border-t border-[#E2E8F0]">
                           <p className="text-[10px] text-[#64748B] text-center">
-                            Results processed on {new Date(req.result.uploadedAt).toLocaleDateString()} · Certified by CareConnect Laboratory Service
+                            Results processed on {new Date(req.result.uploadedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })} · Certified by CareConnect Laboratory Service
                           </p>
                         </div>
                       </>

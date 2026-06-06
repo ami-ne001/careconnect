@@ -36,7 +36,8 @@ export interface RoomCreateRequest {
 }
 
 export interface AdmissionCreateRequest {
-  patientId: number;
+  patientId?: number;
+  userId?: number;
   admittingDoctorId: number;
   roomId: number;
   bedNumber: number;

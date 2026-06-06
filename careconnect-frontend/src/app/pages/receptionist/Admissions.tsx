@@ -43,10 +43,8 @@ export function AdmissionsManagement() {
   const [followUpInstructions, setFollowUpInstructions] = useState("");
 
   const getPatientDisplayName = (pId: number) => {
-    const p = patients.find((pat) => pat.id === pId);
-    if (!p) return `Patient ID #${pId}`;
-    const u = users.find((user) => user.id === p.userId);
-    return u ? `${u.firstName} ${u.lastName}` : `Patient Profile #${p.id}`;
+    const u = users.find((user) => user.id === pId);
+    return u ? `${u.firstName} ${u.lastName}` : `User #${pId}`;
   };
 
   const getDoctorDisplayName = (doctorUserId: number) => {
@@ -101,8 +99,12 @@ export function AdmissionsManagement() {
     }
     setSubmitting(true);
     try {
+      const patientProfile = patients.find(p => p.id === Number(selectedPatientId));
+      if (!patientProfile) return;
+
       const { data: admissionData } = await receptionistApi.admitPatient({
-        patientId: Number(selectedPatientId),
+        patientId: patientProfile.userId,
+        userId: patientProfile.userId,
         admittingDoctorId: Number(admittingDoctorId),
         roomId: Number(selectedRoomId),
         bedNumber: Number(selectedBedNumber),
@@ -114,7 +116,7 @@ export function AdmissionsManagement() {
       // ── Bill the admission upfront ──────────────────────────────────
       try {
         const { data: newInv } = await billingApi.createInvoice({
-          patientId: Number(selectedPatientId),
+          patientId: patientProfile.userId, // Billing uses Auth User ID
           admissionId: admissionData.id,
           notes: `Admission #${admissionData.id} — ${admissionReason || "Hospital Admission"}`,
         });
@@ -277,7 +279,7 @@ export function AdmissionsManagement() {
                               <div className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center text-white text-xs font-bold shrink-0">{initials}</div>
                               <div>
                                 <p className="font-medium text-[#0F172A] whitespace-nowrap">{pName}</p>
-                                <p className="text-[10px] text-[#64748B]">ID #{a.patientId}</p>
+                                <p className="text-[10px] text-[#64748B]">User ID #{a.patientId}</p>
                               </div>
                             </div>
                           </td>
