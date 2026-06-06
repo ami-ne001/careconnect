@@ -13,6 +13,7 @@ export function PatientBilling() {
   const { userId } = useAuth();
   const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortOrder, setSortOrder] = useState<"DESC" | "ASC">("DESC");
 
   // Payment states
   const [payModal, setPayModal] = useState(false);
@@ -128,6 +129,14 @@ export function PatientBilling() {
           <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
               <h3 className="font-semibold text-[#0F172A]">Invoice History</h3>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as "DESC" | "ASC")}
+                className="h-8 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-[#F8FAFC]"
+              >
+                <option value="DESC">Date: Newest First</option>
+                <option value="ASC">Date: Oldest First</option>
+              </select>
             </div>
             {invoices.length === 0 ? (
               <div className="p-12 text-center text-[#64748B]">No invoices generated yet.</div>
@@ -144,7 +153,13 @@ export function PatientBilling() {
                     </tr>
                   </thead>
                   <tbody>
-                    {invoices.map((inv, i) => {
+                    {[...invoices]
+                      .sort((a, b) => {
+                        const tA = new Date(a.issuedAt).getTime();
+                        const tB = new Date(b.issuedAt).getTime();
+                        return sortOrder === "DESC" ? tB - tA : tA - tB;
+                      })
+                      .map((inv, i) => {
                       const dt = new Date(inv.issuedAt);
                       const formattedDate = dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                       const itemsSummary = inv.items.map(item => `${item.description} (x${item.quantity})`).join(", ");

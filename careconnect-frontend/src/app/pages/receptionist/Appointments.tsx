@@ -20,7 +20,9 @@ export function ReceptionistAppointments() {
   const [doctorAvailableDays, setDoctorAvailableDays] = useState<DoctorAvailabilityResponse[]>([]);
 
   // Filters
+  const [activeTab, setActiveTab] = useState<"Upcoming" | "Completed" | "Cancelled">("Upcoming");
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // Booking Modal
   const [showModal, setShowModal] = useState(false);
@@ -173,9 +175,32 @@ export function ReceptionistAppointments() {
 
   // Filtered Appointments
   const filteredAppointments = appointments.filter((a) => {
-    if (selectedDoctorFilter === "All") return true;
-    return getDoctorName(a.doctorId) === selectedDoctorFilter;
-  });
+    let matchTab = true;
+    if (activeTab === "Upcoming") {
+      matchTab = ["SCHEDULED", "PENDING_APPROVAL", "CHECKED_IN", "IN_PROGRESS"].includes(a.status);
+    } else if (activeTab === "Completed") {
+      matchTab = a.status === "COMPLETED";
+    } else if (activeTab === "Cancelled") {
+      matchTab = a.status === "CANCELLED";
+    }
+
+    let matchDoc = true;
+    let matchStatus = true;
+
+    if (selectedDoctorFilter !== "All") {
+      matchDoc = getDoctorName(a.doctorId) === selectedDoctorFilter;
+    }
+
+    if (activeTab === "Upcoming") {
+      if (statusFilter === "Requests") {
+        matchStatus = a.status === "PENDING_APPROVAL";
+      } else if (statusFilter === "SCHEDULED") {
+        matchStatus = a.status === "SCHEDULED";
+      }
+    }
+
+    return matchTab && matchDoc && matchStatus;
+  }).sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
   return (
     <div>
@@ -202,37 +227,54 @@ export function ReceptionistAppointments() {
         </div>
       ) : (
         <>
+          <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-[#E2E8F0] mb-5 w-fit" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            {["Upcoming", "Completed", "Cancelled"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t as any)}
+                className={`px-5 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                  activeTab === t ? "bg-[#1E3A5F] text-white" : "text-[#64748B] hover:text-[#0F172A]"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
           {/* Table */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
             <div className="px-5 py-4 border-b border-[#E2E8F0] flex flex-wrap gap-3 items-center">
-              <h3 className="font-semibold text-[#0F172A]">All Appointments</h3>
-              <div className="flex gap-2 ml-auto overflow-x-auto">
-                <button
-                  onClick={() => setSelectedDoctorFilter("All")}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer ${
-                    selectedDoctorFilter === "All"
-                      ? "border-[#1E3A5F] bg-[#1E3A5F] text-white"
-                      : "border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"
-                  }`}
+              <h3 className="font-semibold text-[#0F172A]">
+                {activeTab === "Upcoming" ? "Upcoming Appointments" : `${activeTab} Appointments`}
+              </h3>
+              <div className="flex gap-3 ml-auto">
+                {activeTab === "Upcoming" && (
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="h-8 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-[#F8FAFC]"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Requests">Requests (Pending)</option>
+                    <option value="SCHEDULED">Scheduled</option>
+                  </select>
+                )}
+
+                <select
+                  value={selectedDoctorFilter}
+                  onChange={(e) => setSelectedDoctorFilter(e.target.value)}
+                  className="h-8 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-[#F8FAFC]"
                 >
-                  All Doctors
-                </button>
-                {doctors.map((d) => {
-                  const docName = `${d.firstName} ${d.lastName}`;
-                  return (
-                    <button
-                      key={d.id}
-                      onClick={() => setSelectedDoctorFilter(docName)}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer ${
-                        selectedDoctorFilter === docName
-                          ? "border-[#1E3A5F] bg-[#1E3A5F] text-white"
-                          : "border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"
-                      }`}
-                    >
-                      Dr. {d.lastName}
-                    </button>
-                  );
-                })}
+                  <option value="All">All Doctors</option>
+                  {doctors.map((d) => {
+                    const docName = `${d.firstName} ${d.lastName}`;
+                    return (
+                      <option key={d.id} value={docName}>
+                        Dr. {d.lastName}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
             </div>
             <div className="overflow-x-auto">

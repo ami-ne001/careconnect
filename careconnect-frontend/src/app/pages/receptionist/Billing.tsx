@@ -21,6 +21,7 @@ export function ReceptionistBilling() {
   // Search & Filter
   const [searchPatientId, setSearchPatientId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"All" | "Pending" | "Paid" | "Surgeries">("All");
+  const [sortOrder, setSortOrder] = useState<"DESC" | "ASC">("DESC");
 
   // Price Modal
   const [showPriceModal, setShowPriceModal] = useState(false);
@@ -194,7 +195,7 @@ export function ReceptionistBilling() {
               >
                 <option value="">All Patients (Default view)</option>
                 {patients.map((p) => (
-                  <option key={p.id} value={p.id}>{getPatientDisplayName(p)} (ID #{p.id})</option>
+                  <option key={p.id} value={p.userId}>{getPatientDisplayName(p)} (User ID #{p.userId})</option>
                 ))}
               </select>
             </div>
@@ -206,18 +207,31 @@ export function ReceptionistBilling() {
             </button>
           </div>
 
-          <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-[#E2E8F0] mb-5 w-fit" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            {["All", "Pending", "Paid", "Surgeries"].map((t) => (
-              <button
-                key={t}
-                onClick={() => setActiveTab(t as any)}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                  activeTab === t ? "bg-[#1E3A5F] text-white" : "text-[#64748B] hover:text-[#0F172A]"
-                }`}
+          <div className="flex justify-between items-center mb-5">
+            <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-[#E2E8F0] w-fit" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+              {["All", "Pending", "Paid", "Surgeries"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setActiveTab(t as any)}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                    activeTab === t ? "bg-[#1E3A5F] text-white" : "text-[#64748B] hover:text-[#0F172A]"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {activeTab !== "Surgeries" && (
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as "DESC" | "ASC")}
+                className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] bg-white shadow-sm"
               >
-                {t}
-              </button>
-            ))}
+                <option value="DESC">Date: Newest First</option>
+                <option value="ASC">Date: Oldest First</option>
+              </select>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
@@ -286,7 +300,13 @@ export function ReceptionistBilling() {
                         <td colSpan={8} className="p-8 text-center text-[#64748B]">No invoices on record.</td>
                       </tr>
                     ) : (
-                      filteredInvoices.map((inv, i) => {
+                      [...filteredInvoices]
+                        .sort((a, b) => {
+                          const tA = new Date(a.issuedAt).getTime();
+                          const tB = new Date(b.issuedAt).getTime();
+                          return sortOrder === "DESC" ? tB - tA : tA - tB;
+                        })
+                        .map((inv, i) => {
                         const itemsSummary = inv.items.map(item => `${item.description} (x${item.quantity})`).join(", ");
                         const dueDateStr = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "Immediate";
 
